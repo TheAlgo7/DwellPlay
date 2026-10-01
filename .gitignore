@@ -1,0 +1,20 @@
+# Personal settings: SDK path, the Play upload key's location and password, the YouTube API key.
+local.properties
+*.jks
+*.keystore
+
+# Build output
+build/
+.gradle/
+.kotlin/
+bin/
+*.apk
+*.aab
+captures/
+shots/
+__pycache__/
+
+# IDE
+.idea/
+*.iml
+.DS_Store

@@ -1,0 +1,110 @@
+package com.thealgothrim.dwellplay.ui
+
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.unit.dp
+import com.thealgothrim.dwellplay.ui.theme.Palette
+
+/** The few icons the app uses, from Material Icons (Apache 2.0) path data, so no icon library ships. */
+object Icons {
+  private fun icon(name: String, vararg paths: String): ImageVector =
+      ImageVector.Builder(name, 24.dp, 24.dp, 24f, 24f)
+          .apply { paths.forEach { addPath(pathData = addPathNodes(it), fill = SolidColor(Color.White)) } }
+          .build()
+
+  val Play = icon("play", "M8,5v14l11,-7z")
+  val Pause = icon("pause", "M6,19h4V5H6v14zM14,5v14h4V5h-4z")
+  val Next = icon("next", "M6,18l8.5,-6L6,6v12zM16,6v12h2V6h-2z")
+  val Previous = icon("previous", "M6,6h2v12H6zm3.5,6l8.5,6V6z")
+  val Replay = icon("replay", "M12,5V1L7,6l5,5V7c3.31,0 6,2.69 6,6s-2.69,6 -6,6 -6,-2.69 -6,-6H4c0,4.42 3.58,8 8,8s8,-3.58 8,-8 -3.58,-8 -8,-8z")
+  val Forward = icon("forward", "M12,5V1l5,5 -5,5V7c-3.31,0 -6,2.69 -6,6s2.69,6 6,6 6,-2.69 6,-6h2c0,4.42 -3.58,8 -8,8s-8,-3.58 -8,-8 3.58,-8 8,-8z")
+  val Back = icon("back", "M20,11H7.83l5.59,-5.59L12,4l-8,8 8,8 1.41,-1.41L7.83,13H20v-2z")
+  val Close = icon("close", "M19,6.41L17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12z")
+  val Search =
+      icon(
+          "search",
+          "M15.5,14h-0.79l-0.28,-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09,-0.59 4.23,-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99,-5zM9.5,14C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z",
+      )
+  val Home = icon("home", "M10,20v-6h4v6h5v-8h3L12,3 2,12h3v8z")
+  val Settings =
+      icon(
+          "settings",
+          "M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z",
+      )
+  val Library =
+      icon(
+          "library",
+          "M4,6H2v14c0,1.1 0.9,2 2,2h14v-2H4V6zM20,2H8c-1.1,0 -2,0.9 -2,2v12c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V4c0,-1.1 -0.9,-2 -2,-2zM12,14.5v-9l6,4.5 -6,4.5z",
+      )
+  val Phone = icon("phone", "M17,1.01L7,1c-1.1,0 -2,0.9 -2,2v18c0,1.1 0.9,2 2,2h10c1.1,0 2,-0.9 2,-2V3c0,-1.1 -0.9,-1.99 -2,-1.99zM17,19H7V5h10v14z")
+  val Folder = icon("folder", "M10,4H4c-1.1,0 -1.99,0.9 -1.99,2L2,18c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V8c0,-1.1 -0.9,-2 -2,-2h-8l-2,-2z")
+  val Link =
+      icon(
+          "link",
+          "M3.9,12c0,-1.71 1.39,-3.1 3.1,-3.1h4V7H7c-2.76,0 -5,2.24 -5,5s2.24,5 5,5h4v-1.9H7c-1.71,0 -3.1,-1.39 -3.1,-3.1zM8,13h8v-2H8v2zM17,7h-4v1.9h4c1.71,0 3.1,1.39 3.1,3.1s-1.39,3.1 -3.1,3.1h-4V17h4c2.76,0 5,-2.24 5,-5s-2.24,-5 -5,-5z",
+      )
+  /** YouTube is named in words next to this; the icon itself stays generic. */
+  val Embed = icon("embed", "M20,4H4C2.9,4 2,4.9 2,6v12c0,1.1 0.9,2 2,2h16c1.1,0 2,-0.9 2,-2V6C22,4.9 21.1,4 20,4zM9.5,16.5v-9l7,4.5L9.5,16.5z")
+  val Server =
+      icon(
+          "server",
+          "M20,13H4c-0.55,0 -1,0.45 -1,1v6c0,0.55 0.45,1 1,1h16c0.55,0 1,-0.45 1,-1v-6c0,-0.55 -0.45,-1 -1,-1zM7,19c-1.1,0 -2,-0.9 -2,-2s0.9,-2 2,-2 2,0.9 2,2 -0.9,2 -2,2zM20,3H4c-0.55,0 -1,0.45 -1,1v6c0,0.55 0.45,1 1,1h16c0.55,0 1,-0.45 1,-1V4c0,-0.55 -0.45,-1 -1,-1zM7,9c-1.1,0 -2,-0.9 -2,-2s0.9,-2 2,-2 2,0.9 2,2 -0.9,2 -2,2z",
+      )
+  val Captions =
+      icon(
+          "captions",
+          "M19,4H5c-1.11,0 -2,0.9 -2,2v12c0,1.1 0.89,2 2,2h14c1.1,0 2,-0.9 2,-2V6c0,-1.1 -0.9,-2 -2,-2zM11,11H9.5v-0.5h-2v3h2V13H11v1c0,0.55 -0.45,1 -1,1H7c-0.55,0 -1,-0.45 -1,-1v-4c0,-0.55 0.45,-1 1,-1h3c0.55,0 1,0.45 1,1v1zM18,11h-1.5v-0.5h-2v3h2V13H18v1c0,0.55 -0.45,1 -1,1h-3c-0.55,0 -1,-0.45 -1,-1v-4c0,-0.55 0.45,-1 1,-1h3c0.55,0 1,0.45 1,1v1z",
+      )
+  val Fit = icon("fit", "M17,4h3c1.1,0 2,0.9 2,2v2h-2V6h-3V4zM4,8V6h3V4H4C2.9,4 2,4.9 2,6v2H4zM20,16v2h-3v2h3c1.1,0 2,-0.9 2,-2v-2H20zM7,18H4v-2H2v2c0,1.1 0.9,2 2,2h3V18zM18,8H6v8h12V8z")
+  val Theater = icon("theater", "M7,14H5v5h5v-2H7v-3zM5,10h2V7h3V5H5v5zM17,17h-3v2h5v-5h-2v3zM14,5v2h3v3h2V5h-5z")
+  val TheaterExit = icon("theater_exit", "M5,16h3v3h2v-5H5v2zM8,8H5v2h5V5H8v3zM14,19h2v-3h3v-2h-5v5zM16,8V5h-2v5h5V8h-3z")
+  val Add = icon("add", "M19,13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z")
+  val Check = icon("check", "M9,16.17L4.83,12l-1.42,1.41L9,19 21,7l-1.41,-1.41z")
+  val Error =
+      icon(
+          "error",
+          "M11,15h2v2h-2zM11,7h2v6h-2zM11.99,2C6.47,2 2,6.48 2,12s4.47,10 9.99,10C17.52,22 22,17.52 22,12S17.52,2 11.99,2zM12,20c-4.42,0 -8,-3.58 -8,-8s3.58,-8 8,-8 8,3.58 8,8 -3.58,8 -8,8z",
+      )
+  val Parked = icon("parked", "M13,3H6v18h4v-6h3c3.31,0 6,-2.69 6,-6s-2.69,-6 -6,-6zM13.2,11H10V7h3.2c1.1,0 2,0.9 2,2s-0.9,2 -2,2z")
+  val Car =
+      icon(
+          "car",
+          "M18.92,6.01C18.72,5.42 18.16,5 17.5,5h-11c-0.66,0 -1.21,0.42 -1.42,1.01L3,12v8c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-1h12v1c0,0.55 0.45,1 1,1h1c0.55,0 1,-0.45 1,-1v-8l-2.08,-5.99zM6.5,16c-0.83,0 -1.5,-0.67 -1.5,-1.5S5.67,13 6.5,13s1.5,0.67 1.5,1.5S7.33,16 6.5,16zM17.5,16c-0.83,0 -1.5,-0.67 -1.5,-1.5s0.67,-1.5 1.5,-1.5 1.5,0.67 1.5,1.5 -0.67,1.5 -1.5,1.5zM5,11l1.5,-4.5h11L19,11H5z",
+      )
+  val Refresh =
+      icon(
+          "refresh",
+          "M17.65,6.35C16.2,4.9 14.21,4 12,4c-4.42,0 -7.99,3.58 -7.99,8s3.57,8 7.99,8c3.73,0 6.84,-2.55 7.73,-6h-2.08c-0.82,2.33 -3.04,4 -5.65,4 -3.31,0 -6,-2.69 -6,-6s2.69,-6 6,-6c1.66,0 3.14,0.69 4.22,1.78L13,11h7V4l-2.35,2.35z",
+      )
+  val Delete = icon("delete", "M6,19c0,1.1 0.9,2 2,2h8c1.1,0 2,-0.9 2,-2V7H6v12zM19,4h-3.5l-1,-1h-5l-1,1H5v2h14V4z")
+  val MusicVideo =
+      icon(
+          "music_video",
+          "M21,3H3C1.89,3 1,3.89 1,5v14c0,1.1 0.89,2 2,2h18c1.1,0 2,-0.9 2,-2V5c0,-1.11 -0.9,-2 -2,-2zM21,19H3V5h18v14zM8,15c0,-1.66 1.34,-3 3,-3 0.35,0 0.69,0.07 1,0.18V6h5v2h-3v7.03c-0.02,1.64 -1.35,2.97 -3,2.97 -1.66,0 -3,-1.34 -3,-3z",
+      )
+  val Queue = icon("queue", "M19,9H2v2h17V9zM19,5H2v2h17V5zM2,15h13v-2H2V15zM17,13v6l5,-3L17,13z")
+  val Info =
+      icon(
+          "info",
+          "M11,7h2v2h-2zM11,11h2v6h-2zM12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8z",
+      )
+  val Open = icon("open", "M19,19H5V5h7V3H5c-1.11,0 -2,0.9 -2,2v14c0,1.1 0.89,2 2,2h14c1.1,0 2,-0.9 2,-2v-7h-2v7zM14,3v2h3.59l-9.83,9.83 1.41,1.41L19,6.41V10h2V3h-7z")
+
+  /** The DwellPlay monogram in its own colours: a white d whose bowl holds a teal play triangle. */
+  val Monogram: ImageVector =
+      ImageVector.Builder("monogram", 108.dp, 108.dp, 108f, 108f)
+          .addPath(
+              pathData = addPathNodes("M34.5,62.5a19,19 0 1,0 38,0a19,19 0 1,0 -38,0z M40.5,62.5a13,13 0 1,0 26,0a13,13 0 1,0 -26,0z"),
+              pathFillType = PathFillType.EvenOdd,
+              fill = SolidColor(Palette.Text),
+          )
+          .addPath(
+              pathData = addPathNodes("M70,26.5A3.5,3.5 0,0 1,73.5 30L73.5,78A3.5,3.5 0,0 1,70 81.5A3.5,3.5 0,0 1,66.5 78L66.5,30A3.5,3.5 0,0 1,70 26.5z"),
+              fill = SolidColor(Palette.Text),
+          )
+          .addPath(pathData = addPathNodes("M49.5,55.5L49.5,69.5L61.5,62.5z"), fill = SolidColor(Palette.Accent))
+          .build()
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Store build only: DwellPlay as an Android Auto media app (sound, usable while driving).
+  The personal build leaves this out on purpose. Android Auto lists one entry per app, and a
+  driving-optimized entry hides the parked video screen the personal build exists for.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+    </application>
+</manifest>

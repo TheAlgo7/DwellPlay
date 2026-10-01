@@ -1,0 +1,135 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.plugin.compose'
+    id 'org.jetbrains.kotlin.plugin.serialization'
+}
+
+// Personal settings, never committed: the optional YouTube Data API key and the Play upload key.
+def props = new Properties()
+def localProps = rootProject.file("local.properties")
+if (localProps.exists()) localProps.withInputStream { props.load(it) }
+
+android {
+    namespace 'com.thealgothrim.dwellplay'
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId "com.thealgothrim.dwellplay"
+        // Android Auto runs parked apps on the car screen from Android 15; the phone app itself works from 10.
+        minSdk 29
+        targetSdk 36
+        versionCode 1
+        versionName "0.1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        // Search needs a YouTube Data API key (free, 100 searches a day). Shared links work without one.
+        buildConfigField "String", "YOUTUBE_API_KEY", "\"${props.getProperty("youtubeApiKey", "")}\""
+    }
+
+    // Two builds of the same app (see docs/android-auto.md):
+    //  personal: for Gaurav's car today. Declared as a parked "game" because that is the only parked
+    //            category Android Auto opens today; Android Auto then shows it on the car screen while
+    //            parked and closes it when the car moves. Internal testing only, never a public track.
+    //            It leaves out the Android Auto media declaration: with it, Android Auto hides the
+    //            parked screen (src/store/AndroidManifest.xml has the declaration).
+    //  store:    the honest declaration (video). Right for Android Automotive OS now, and for Android
+    //            Auto once Google opens the video category (announced May 2026, Tata on the list).
+    flavorDimensions 'car'
+    productFlavors {
+        personal {
+            dimension 'car'
+            manifestPlaceholders = [appCategory: 'game']
+            buildConfigField "String", "CAR_ROUTE", '"personal"'
+        }
+        store {
+            dimension 'car'
+            manifestPlaceholders = [appCategory: 'video']
+            buildConfigField "String", "CAR_ROUTE", '"store"'
+        }
+    }
+
+    signingConfigs {
+        upload {
+            if (props.getProperty("uploadStoreFile")) {
+                storeFile file(props.getProperty("uploadStoreFile"))
+                storePassword props.getProperty("uploadStorePassword")
+                keyAlias props.getProperty("uploadKeyAlias")
+                keyPassword props.getProperty("uploadKeyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        // Test builds install next to the Play copy, so testing over USB never removes the car's copy.
+        debug {
+            applicationIdSuffix ".debug"
+        }
+        release {
+            // R8 takes the APK from about 42 MB (debug) to a fraction of that.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (props.getProperty("uploadStoreFile")) signingConfig signingConfigs.upload
+        }
+    }
+
+    // CarUxRestrictionsManager (Android Automotive OS). Loaded only on cars; phones never touch it.
+    useLibrary 'android.car'
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    buildFeatures {
+        compose true
+        buildConfig true
+    }
+    packagingOptions {
+        resources {
+            excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+}
+
+def media3 = '1.11.1'
+
+dependencies {
+    implementation project(':core')
+
+    implementation 'androidx.core:core-ktx:1.17.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.10.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-compose:2.10.0'
+    implementation 'androidx.lifecycle:lifecycle-process:2.10.0'
+    implementation 'androidx.activity:activity-compose:1.13.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.11.0'
+
+    implementation platform('androidx.compose:compose-bom:2026.02.01')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.compose.material3:material3'
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+
+    implementation "androidx.media3:media3-exoplayer:$media3"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3"
+    implementation "androidx.media3:media3-exoplayer-dash:$media3"
+    implementation "androidx.media3:media3-session:$media3"
+    implementation "androidx.media3:media3-ui-compose:$media3"
+    implementation "androidx.media3:media3-datasource-okhttp:$media3"
+
+    // CarConnection (is Android Auto connected?) and CarFeatures (audio while driving on Android Automotive OS).
+    implementation 'androidx.car.app:app:1.7.0'
+
+    implementation platform('io.coil-kt.coil3:coil-bom:3.4.0')
+    implementation 'io.coil-kt.coil3:coil-compose'
+    implementation 'io.coil-kt.coil3:coil-network-okhttp'
+
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.3.0'
+    androidTestImplementation 'androidx.test:runner:1.7.0'
+}

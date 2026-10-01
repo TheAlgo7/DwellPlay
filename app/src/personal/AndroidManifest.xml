@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Personal build only: put the app on Android Auto's car screen while parked (Android 15+ phones).
+  Android Auto lists parked apps from CAR_LAUNCHER; together with appCategory="game" (build.gradle)
+  it shows DwellPlay in the car's app grid and closes it the moment the car moves. Never promote this
+  build past Play's internal testing track: see docs/android-auto.md.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.CAR_LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

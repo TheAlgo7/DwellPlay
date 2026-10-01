@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{margin:0;background:#1a1d22;display:flex;gap:40px;padding:40px;flex-wrap:wrap;font-family:Segoe UI, sans-serif;color:#ccd}
+.cell{display:flex;flex-direction:column;align-items:center;gap:10px}
+.icon{width:216px;height:216px;border-radius:50%;overflow:hidden}
+.sq{border-radius:44px}
+.small{width:48px;height:48px}
+</style></head><body>
+<script>
+// DwellPlay launcher icon: a lowercase d whose bowl holds a play triangle and whose stem is a pause bar.
+const variants = {
+ A:{ring:'#F4F7FA',stem:'#F4F7FA',tri:'#57D6C7',bg:'#0B0D10'},
+ B:{ring:'#57D6C7',stem:'#F4F7FA',tri:'#F4F7FA',bg:'#0B0D10'},
+ D:{ring:'#0B0D10',stem:'#0B0D10',tri:'#0B0D10',bg:'#57D6C7'},
+};
+function svg(v){return `<svg viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg">
+<rect width="108" height="108" fill="${v.bg}"/>
+<path fill="${v.ring}" fill-rule="evenodd" d="M34.5,62.5a19,19 0 1,0 38,0a19,19 0 1,0 -38,0z M40.5,62.5a13,13 0 1,0 26,0a13,13 0 1,0 -26,0z"/>
+<rect x="66.5" y="26.5" width="7" height="55" rx="3.5" fill="${v.stem}"/>
+<path fill="${v.tri}" d="M49.5,55.5 L49.5,69.5 L61.5,62.5z"/>
+</svg>`}
+for (const [k,v] of Object.entries(variants)){
+  const c=document.createElement('div');c.className='cell';
+  c.innerHTML=`<div class="icon">${svg(v)}</div><div class="icon sq">${svg(v)}</div><div class="icon small">${svg(v)}</div><div>${k}</div>`;
+  document.body.appendChild(c);
+}
+</script></body></html>

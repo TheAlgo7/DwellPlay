@@ -1,0 +1,113 @@
+<!doctype html>
+<!--
+  YouTube's official IFrame player, loaded with the app's own https://<package> origin so YouTube
+  receives the Referer its required-minimum-functionality rules ask for. Nothing is drawn over the
+  player, its ads and controls are untouched, and it never plays hidden: the app unloads it when the
+  screen goes away.
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<style>
+  html, body { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; }
+  #player { position: absolute; inset: 0; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+<div id="player"></div>
+<script>
+  var ORIGIN = "__ORIGIN__";
+  var player = null;
+  var ready = false;
+  var pending = null;
+  var ticker = null;
+
+  function bridge() { return window.DwellBridge; }
+
+  function onYouTubeIframeAPIReady() {
+    if (pending) { create(pending); pending = null; }
+    bridge() && bridge().onApiReady();
+  }
+
+  function vars(start, autoplay, captions, playlistId) {
+    var v = {
+      playsinline: 1, rel: 0, fs: 0, enablejsapi: 1, iv_load_policy: 3,
+      autoplay: autoplay ? 1 : 0, start: Math.max(0, start | 0),
+      cc_load_policy: captions ? 1 : 0,
+      origin: ORIGIN, widget_referrer: ORIGIN
+    };
+    if (playlistId) { v.listType = "playlist"; v.list = playlistId; }
+    return v;
+  }
+
+  function create(req) {
+    ready = false;
+    player = new YT.Player("player", {
+      width: "100%", height: "100%",
+      host: "https://www.youtube.com",
+      videoId: req.videoId || undefined,
+      playerVars: vars(req.start, req.autoplay, req.captions, req.playlistId),
+      events: {
+        onReady: function () {
+          ready = true;
+          bridge() && bridge().onReady();
+          startTicker();
+        },
+        onStateChange: function (e) { bridge() && bridge().onState(e.data); },
+        onError: function (e) { bridge() && bridge().onError(e.data | 0); }
+      }
+    });
+  }
+
+  function startTicker() {
+    if (ticker) clearInterval(ticker);
+    ticker = setInterval(function () {
+      if (!player || !ready || !player.getCurrentTime) return;
+      var id = "";
+      try { id = (player.getVideoData && player.getVideoData().video_id) || ""; } catch (e) {}
+      bridge() && bridge().onProgress(player.getCurrentTime() || 0, player.getDuration() || 0, id);
+    }, 500);
+  }
+
+  // Called from Kotlin.
+  var dwell = {
+    load: function (videoId, playlistId, start, autoplay, captions) {
+      var req = { videoId: videoId, playlistId: playlistId, start: start, autoplay: autoplay, captions: captions };
+      if (!window.YT || !YT.Player) { pending = req; return; }
+      if (player && ready) {
+        if (playlistId) {
+          var args = { list: playlistId, listType: "playlist", index: 0, startSeconds: start | 0 };
+          autoplay ? player.loadPlaylist(args) : player.cuePlaylist(args);
+        } else {
+          var one = { videoId: videoId, startSeconds: start | 0 };
+          autoplay ? player.loadVideoById(one) : player.cueVideoById(one);
+        }
+      } else {
+        if (player) { try { player.destroy(); } catch (e) {} }
+        create(req);
+      }
+    },
+    play: function () { player && ready && player.playVideo(); },
+    pause: function () { player && ready && player.pauseVideo(); },
+    seek: function (s) { player && ready && player.seekTo(s, true); },
+    stop: function () {
+      if (ticker) { clearInterval(ticker); ticker = null; }
+      if (player) { try { player.stopVideo(); player.destroy(); } catch (e) {} }
+      player = null; ready = false;
+      document.getElementById("player") || (function () {
+        var d = document.createElement("div"); d.id = "player"; document.body.appendChild(d);
+      })();
+    },
+    next: function () { player && ready && player.nextVideo(); },
+    previous: function () { player && ready && player.previousVideo(); },
+    captions: function (on) {
+      if (!player || !ready) return;
+      try { on ? player.loadModule("captions") : player.unloadModule("captions"); } catch (e) {}
+    }
+  };
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>
