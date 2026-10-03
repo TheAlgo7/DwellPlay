@@ -93,6 +93,19 @@ class PlaybackService : MediaLibraryService() {
   private inner class LibraryCallback : MediaLibrarySession.Callback {
     private val tree = BrowseTree(AppGraph.library)
 
+    /**
+     * Who may list the library and drive playback: the system (the notification, Bluetooth,
+     * lock screen), DwellPlay itself, and the car and assistant apps by name. Any other installed
+     * app is refused, so it can't read what someone watches.
+     */
+    override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
+      if (controller.isTrusted || controller.packageName == packageName || controller.packageName in CAR_AND_ASSISTANT) {
+        return super.onConnect(session, controller)
+      }
+      Log.i(TAG, "Refused media controller ${controller.packageName}")
+      return MediaSession.ConnectionResult.reject()
+    }
+
     override fun onGetLibraryRoot(
         session: MediaLibrarySession,
         browser: MediaSession.ControllerInfo,
@@ -178,5 +191,15 @@ class PlaybackService : MediaLibraryService() {
 
   private companion object {
     const val TAG = "PlaybackService"
+
+    /** Android Auto, Android Automotive's media centre and Google's assistants, which may not count as "trusted". */
+    val CAR_AND_ASSISTANT =
+        setOf(
+            "com.google.android.projection.gearhead",
+            "com.android.car.media",
+            "com.google.android.carassistant",
+            "com.google.android.googlequicksearchbox",
+            "com.google.android.apps.bard",
+        )
   }
 }

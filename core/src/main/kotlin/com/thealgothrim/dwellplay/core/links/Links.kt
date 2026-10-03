@@ -1,6 +1,7 @@
 package com.thealgothrim.dwellplay.core.links
 
 import com.thealgothrim.dwellplay.core.model.StreamKind
+import com.thealgothrim.dwellplay.core.net.LocalNetwork
 import java.net.URI
 import java.net.URLDecoder
 
@@ -52,6 +53,8 @@ object Links {
     OFFICIAL_APP_ONLY.entries.firstOrNull { host == it.key || host.endsWith("." + it.key) }?.let {
       return LinkKind.Unsupported("${it.value} plays only in its own app.")
     }
+    // Plain http only on the local network, so nothing someone watches crosses the internet unencrypted.
+    if (!LocalNetwork.allowed(url)) return LinkKind.Unsupported("Use the link's https address. Plain http works only on your own network.")
     return LinkKind.Stream(url, streamKind(url))
   }
 

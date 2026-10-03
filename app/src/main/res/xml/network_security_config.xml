@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Plain http is allowed at the platform level only because a home Jellyfin server usually has no
+  certificate (http://192.168.1.20:8096). The app itself refuses http to anything that isn't on the
+  local network (core/.../net/LocalNetwork.kt checks every server address and stream link as it
+  comes in), so traffic to the internet is https. Android can't express private address ranges here.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

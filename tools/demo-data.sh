@@ -25,12 +25,12 @@ make "Colour bars 1080p.mp4" "smptehdbars=size=1920x1080:rate=30" 523 45
 make "Cinemascope sample 21x9.mp4" "mandelbrot=size=1280x544:rate=25" 220 40
 
 adb install -r "$ROOT/app/build/outputs/apk/personal/debug/app-personal-debug.apk" | tail -1
-adb shell "mkdir -p '/sdcard/Movies/Music Videos'"
+adb shell "mkdir -p '/sdcard/Movies/DwellPlay'"
 for f in "$MEDIA"/*.mp4; do
   name="$(basename "$f")"
-  adb push "$f" "/sdcard/Movies/Music Videos/$name" >/dev/null
+  adb push "$f" "/sdcard/Movies/DwellPlay/$name" >/dev/null
   # adb-pushed files stay "pending" in MediaStore until scanned, and apps can't see pending files.
-  adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///storage/emulated/0/Movies/Music%20Videos/${name// /%20}" >/dev/null
+  adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file:///storage/emulated/0/Movies/DwellPlay/${name// /%20}" >/dev/null
 done
 adb shell pm grant $PKG android.permission.READ_MEDIA_VIDEO
 

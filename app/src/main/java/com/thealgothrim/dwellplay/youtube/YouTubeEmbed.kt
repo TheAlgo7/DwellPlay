@@ -67,6 +67,9 @@ private class EmbedPlayer(private val context: Context, private val hub: PlayerH
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
         settings.setSupportMultipleWindows(false)
+        // The page is our own asset; it never needs the phone's files or other apps' content.
+        settings.allowFileAccess = false
+        settings.allowContentAccess = false
         webChromeClient =
             object : WebChromeClient() {
               // No grey play-icon poster while a video loads.
@@ -84,7 +87,10 @@ private class EmbedPlayer(private val context: Context, private val hub: PlayerH
               // Links out of the player (the title, the YouTube logo) open in the YouTube app, never in here.
               override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 if (!request.isForMainFrame) return false
-                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, request.url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                // Only web links leave, and only to another app: no intent: or app-specific schemes.
+                if (request.url.scheme in setOf("https", "http")) {
+                  runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, request.url).addCategory(Intent.CATEGORY_BROWSABLE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                }
                 return true
               }
 

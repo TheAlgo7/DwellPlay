@@ -15,6 +15,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
+import com.thealgothrim.dwellplay.core.net.LocalNetwork
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -349,7 +350,12 @@ class JellyfinClient(
       // The web app's address: https://host/web/index.html#!/home.html -> https://host
       t = t.substringBefore('#').substringBefore("/web/").removeSuffix("/web").trimEnd('/')
       val withScheme = if (t.startsWith("http://", true) || t.startsWith("https://", true)) listOf(t) else listOf("https://$t", "http://$t")
-      return withScheme.mapNotNull { it.toHttpUrlOrNull()?.toString()?.trimEnd('/') }.distinct()
+      // Plain http only on the local network: a server on the internet is tried over https instead.
+      return withScheme
+          .mapNotNull { it.toHttpUrlOrNull() }
+          .map { if (it.scheme == "http" && !LocalNetwork.isLocalHost(it.host)) it.newBuilder().scheme("https").build() else it }
+          .map { it.toString().trimEnd('/') }
+          .distinct()
     }
 
     private fun withApiKey(url: String, token: String): String {
