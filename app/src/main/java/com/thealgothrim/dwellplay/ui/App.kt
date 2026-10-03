@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -30,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
@@ -122,6 +124,7 @@ object AppMessages {
   }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
   val hub = AppGraph.hub
@@ -243,7 +246,8 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
           MiniPlayer(backdrop, onOpen = { nav.playerOpen = true })
           Spacer(Modifier.height(10.dp))
         }
-        if (!wide) Dock(nav, backdrop)
+        // The dock steps aside while typing, so search results keep the room above the keyboard.
+        if (!wide && !WindowInsets.isImeVisible) Dock(nav, backdrop)
         Spacer(Modifier.height(if (wide) 16.dp else 14.dp))
       }
     }
