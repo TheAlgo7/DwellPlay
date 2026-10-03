@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds: the app's near-black canvas, lit softly from the top left. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="radial"
+                android:centerX="34"
+                android:centerY="26"
+                android:gradientRadius="104"
+                android:startColor="#FF1A1B20"
+                android:endColor="#FF08090B" />
+        </aapt:attr>
+    </path>
+</vector>

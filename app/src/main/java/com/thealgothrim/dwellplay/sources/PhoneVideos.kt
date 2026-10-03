@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
+import com.thealgothrim.dwellplay.BuildConfig
 import com.thealgothrim.dwellplay.core.model.MediaRef
 import com.thealgothrim.dwellplay.core.model.SourceType
 import com.thealgothrim.dwellplay.core.model.Video
@@ -45,6 +46,15 @@ object PhoneVideos {
     }
   }
 
+  /**
+   * The one folder DwellPlay shows by itself, the way Picsart keeps its own Fonts folder: Movies ›
+   * DwellPlay. The rest of the phone stays out of sight unless it is added as a folder in Sources,
+   * so passengers never see someone's personal videos on the car screen.
+   */
+  const val FOLDER = "Movies/DwellPlay/"
+  const val FOLDER_LABEL = "Movies › DwellPlay"
+  const val NAME = "DwellPlay folder"
+
   suspend fun scan(context: Context): List<Video> =
       withContext(Dispatchers.IO) {
         if (access(context) == Access.NONE) return@withContext emptyList()
@@ -63,7 +73,12 @@ object PhoneVideos {
                 MediaStore.Video.Media.ARTIST,
             )
         val out = ArrayList<Video>()
-        context.contentResolver.query(collection, projection, null, null, "${MediaStore.Video.Media.DATE_ADDED} DESC")?.use { c ->
+        val only = testFiles(context)
+        val selection =
+            "${MediaStore.Video.Media.RELATIVE_PATH} LIKE ?" +
+                if (only.isEmpty()) "" else " AND ${MediaStore.Video.Media.DISPLAY_NAME} IN (${only.joinToString(",") { "?" }})"
+        val args = arrayOf("$FOLDER%") + only
+        context.contentResolver.query(collection, projection, selection, args, "${MediaStore.Video.Media.DATE_ADDED} DESC")?.use { c ->
           val id = c.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
           val name = c.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
           val title = c.getColumnIndexOrThrow(MediaStore.Video.Media.TITLE)
@@ -97,6 +112,14 @@ object PhoneVideos {
         }
         out
       }
+
+  /**
+   * Debug builds only: tests on someone's own phone can limit the app to named test files (the
+   * DebugReceiver "only" command), so screens and screenshots never show their personal videos.
+   */
+  fun testFiles(context: Context): List<String> =
+      if (!BuildConfig.DEBUG) emptyList()
+      else context.getSharedPreferences("debug", Context.MODE_PRIVATE).getString("only_files", null)?.split('|')?.filter { it.isNotBlank() }.orEmpty()
 
   /** "VID_20260912_184501" stays as is; "Coldplay_-_Yellow.mp4" becomes "Coldplay - Yellow". */
   fun niceTitle(title: String?, displayName: String?): String {

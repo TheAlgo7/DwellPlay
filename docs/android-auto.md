@@ -65,6 +65,14 @@ To read that log yourself: `adb logcat | grep -E "GH.AvailableAppFinder|CAR.VALI
 
 Still not proven: the real car. The head unit simulator accepts a USB-installed build once "Unknown sources" is on; a real car, as with Overworld Maps, wants the app to come from Play.
 
+## What the head unit taught us on 3 October (0.2.0)
+
+Tested on the Desktop Head Unit (Curvv preset) with the real phone, using only test videos in Movies › DwellPlay.
+
+1. **Android Auto swallows touches in the top corners even when it draws nothing there.** A full-screen back button 120px from the left edge never received the head unit's taps, while the same tap sent straight to the app worked. Full screen therefore keeps every tappable control in the bottom bar, and the panoramic player's header keeps left of the Exit corner instead of the whole panel starting below it.
+2. **One task was not enough.** With a single activity, opening DwellPlay on the phone while it was open on the car stacked the new screen onto the car's task, on the car display. The personal build now gives Android Auto its own entry (`CarActivity`, a subclass with `taskAffinity=".car"`), so the phone and the car each keep a window and the phone can act as the remote. Launches with no source display (`adb shell am start` without `--display 0`) still land on whichever display was focused last; a tap on the phone's launcher starts on the phone.
+3. **Performance at 60Hz.** The video surface presented at 60.6fps with every interval between 16.6 and 16.8ms (SurfaceFlinger latency data for the video layer). Browsing with the glass rail: median 5ms, 99th percentile 12ms per frame, 1 to 3ms of GPU. With full-screen controls hidden the app draws nothing. The debug build's UI thread is several times slower (14ms median for a seek bar tick) than the release build's (5ms median, 0.5% janky), so the car should run the release build.
+
 ## Into the Curvv, step by step
 
 Same path Overworld Maps took, because Android Auto in a real car only trusts apps that came from Play.

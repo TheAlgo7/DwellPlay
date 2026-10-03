@@ -53,6 +53,15 @@ adb logcat -s DwellDebug
 
 `play` starts a session but doesn't open the player screen. YouTube refuses to play unseen (that's the rule working), so tap the mini player to open it.
 
+Testing on someone's own phone: phone videos come only from Movies › DwellPlay, and a debug build can be narrowed further to named files so nothing personal ever reaches a screen or a screenshot:
+
+```bash
+adb shell am broadcast $R -a only --es files "'a.mp4|b.mp4'"   # only these files
+adb shell am broadcast $R -a only --es files "''"               # back to the whole DwellPlay folder
+```
+
+Frame timing on a phone driving Android Auto: find DwellPlay's display with `adb shell dumpsys activity activities`, scroll it with `adb shell input -d <display> swipe ...`, then read `adb shell dumpsys gfxinfo com.thealgothrim.dwellplay.debug` (reset it first with `reset`). For the video itself, `adb shell dumpsys SurfaceFlinger --list` gives the SurfaceView layer and `--latency '<layer name>'` its present times. Measure release builds: debug Compose is several times slower on the UI thread.
+
 ### The car screen without a car
 
 An emulator can show a second display at the Curvv's panel size, and DwellPlay can be told to treat it as Android Auto's:

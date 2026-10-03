@@ -1,26 +1,47 @@
-<!doctype html><html><head><meta charset="utf-8"><style>
-body{margin:0;background:#1a1d22;display:flex;gap:40px;padding:40px;flex-wrap:wrap;font-family:Segoe UI, sans-serif;color:#ccd}
-.cell{display:flex;flex-direction:column;align-items:center;gap:10px}
-.icon{width:216px;height:216px;border-radius:50%;overflow:hidden}
-.sq{border-radius:44px}
-.small{width:48px;height:48px}
-</style></head><body>
+<!doctype html>
+<html><head><meta charset="utf-8"><title>DwellPlay icon</title>
+<style>
+  body { margin: 0; padding: 40px; background: #08090B; color: #A9ABB2; font: 14px "Segoe UI", system-ui, sans-serif; }
+  h2 { color: #F2F2F2; font-weight: 600; font-size: 16px; margin: 36px 0 16px; }
+  .row { display: flex; gap: 36px; align-items: flex-end; flex-wrap: wrap; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .tile { overflow: hidden; }
+  .tile img { width: 150%; height: 150%; margin: -25%; display: block; }  /* 72dp of the 108dp canvas */
+  .circle { border-radius: 50%; }
+  .squircle { border-radius: 30%; }
+  .rounded { border-radius: 22%; }
+  .light { background: #E9EAEE; padding: 28px; border-radius: 16px; }
+  .wall { background: radial-gradient(circle at 30% 20%, #3a3f4d, #14161c 70%); padding: 28px; border-radius: 16px; }
+  .themed { background: #2E3341; display: grid; place-items: center; }
+  .themed img { filter: brightness(0.86) sepia(0.4) hue-rotate(185deg) saturate(1.6); }
+  .bar { background: #000; padding: 10px 16px; border-radius: 8px; display: flex; gap: 10px; align-items: center; color: #fff; }
+  .splash { width: 240px; height: 420px; background: #08090B; border: 1px solid #222; border-radius: 22px; display: grid; place-items: center; }
+</style></head>
+<body>
+<h2>Launcher (adaptive icon in the common masks)</h2>
+<div class="row wall" id="masks"></div>
+<h2>Small sizes</h2>
+<div class="row wall" id="small"></div>
+<h2>On a light wallpaper</h2>
+<div class="row light" id="light"></div>
+<h2>Themed icon, status bar, splash</h2>
+<div class="row">
+  <div class="cell"><div class="tile circle themed" style="width:96px;height:96px"><img src="svg/dwellplay-mark-white.svg" style="width:52%;height:auto"></div>Themed</div>
+  <div class="cell"><div class="bar"><img src="svg/dwellplay-mark-white.svg" style="height:16px"> 12:41</div>Status bar</div>
+  <div class="cell"><div class="splash"><img src="svg/dwellplay-mark-crimson.svg" style="width:96px"></div>Splash (Android 12+)</div>
+  <div class="cell"><div style="display:flex;align-items:center;gap:10px"><img src="svg/dwellplay-mark-crimson.svg" style="height:19px"><span style="color:#F2F2F2;font:700 22px system-ui;letter-spacing:-0.01em">DwellPlay</span></div>In-app wordmark</div>
+</div>
 <script>
-// DwellPlay launcher icon: a lowercase d whose bowl holds a play triangle and whose stem is a pause bar.
-const variants = {
- A:{ring:'#F2F2F2',stem:'#F2F2F2',tri:'#C9183C',bg:'#08090B'},
- B:{ring:'#C9183C',stem:'#F2F2F2',tri:'#F2F2F2',bg:'#08090B'},
- D:{ring:'#08090B',stem:'#08090B',tri:'#08090B',bg:'#C9183C'},
-};
-function svg(v){return `<svg viewBox="0 0 108 108" xmlns="http://www.w3.org/2000/svg">
-<rect width="108" height="108" fill="${v.bg}"/>
-<path fill="${v.ring}" fill-rule="evenodd" d="M34.5,62.5a19,19 0 1,0 38,0a19,19 0 1,0 -38,0z M40.5,62.5a13,13 0 1,0 26,0a13,13 0 1,0 -26,0z"/>
-<rect x="66.5" y="26.5" width="7" height="55" rx="3.5" fill="${v.stem}"/>
-<path fill="${v.tri}" d="M49.5,55.5 L49.5,69.5 L61.5,62.5z"/>
-</svg>`}
-for (const [k,v] of Object.entries(variants)){
-  const c=document.createElement('div');c.className='cell';
-  c.innerHTML=`<div class="icon">${svg(v)}</div><div class="icon sq">${svg(v)}</div><div class="icon small">${svg(v)}</div><div>${k}</div>`;
-  document.body.appendChild(c);
-}
-</script></body></html>
+  const icon = 'svg/dwellplay-icon.svg';
+  const add = (id, cls, size, label) => {
+    const c = document.createElement('div'); c.className = 'cell';
+    c.innerHTML = `<div class="tile ${cls}" style="width:${size}px;height:${size}px"><img src="${icon}" style="width:100%;height:100%;margin:0"></div>${label}`;
+    document.getElementById(id).appendChild(c);
+  };
+  add('masks', 'circle', 144, 'Circle (Pixel, Android Auto)');
+  add('masks', 'squircle', 144, 'Squircle (One UI)');
+  add('masks', 'rounded', 144, 'Rounded square (Play)');
+  for (const s of [72, 48, 36, 24]) add('small', 'squircle', s, s + 'px');
+  add('light', 'circle', 96, 'Circle'); add('light', 'squircle', 96, 'Squircle');
+</script>
+</body></html>

@@ -31,6 +31,10 @@ object CarScreens {
         .onFailure { Log.w(TAG, "CarConnection unavailable", it) }
   }
 
+  /** Android Auto is connected right now (not merely unknown yet). The phone then hands the picture to the car. */
+  val projecting: Boolean
+    get() = pretendProjecting || _connection.value == CarConnection.CONNECTION_TYPE_PROJECTION
+
   fun isAutomotive(context: Context): Boolean = context.packageManager.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
 
   fun detect(activity: Activity): Screen {

@@ -19,7 +19,7 @@ class BrowseTree(private val library: Library) {
   fun recentRoot(): MediaItem = folder(RECENT, "Recent")
 
   /** The last own-media title played (never YouTube), for "resume" controls. */
-  fun lastPlayed(): Video? = library.data.value.recent.firstOrNull { eligible(it) }
+  fun lastPlayed(): Video? = library.history.value.firstOrNull { eligible(it) }
 
   fun children(parentId: String): List<MediaItem> =
       when (parentId) {
@@ -27,7 +27,7 @@ class BrowseTree(private val library: Library) {
         ROOT ->
             buildList {
               add(folder(CONTINUE, "Continue"))
-              add(folder(PHONE, "On ${com.thealgothrim.dwellplay.car.Device.here}"))
+              add(folder(PHONE, com.thealgothrim.dwellplay.sources.PhoneVideos.NAME))
               if (library.sources.value.isNotEmpty() || library.saved.value.any { it.type == SourceType.STREAM }) add(folder(MORE, "Servers and links"))
             }
         CONTINUE -> library.continueWatching.value.filter { eligible(it) }.map { playable(it) }

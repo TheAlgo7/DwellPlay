@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import coil3.compose.AsyncImage
 import com.thealgothrim.dwellplay.core.model.MediaRef
 import com.thealgothrim.dwellplay.core.model.SourceType
@@ -55,14 +57,15 @@ import com.thealgothrim.dwellplay.ui.theme.LocalDims
 import com.thealgothrim.dwellplay.ui.theme.LocalType
 import com.thealgothrim.dwellplay.ui.theme.Palette
 
-/** Monogram and name. */
+/** The crimson mark and the name, as on the brand board. The mark follows the text's font scale. */
 @Composable
 fun Wordmark(modifier: Modifier = Modifier) {
-  val type = LocalType.current
-  val dims = LocalDims.current
+  val style = LocalType.current.heading.copy(fontWeight = FontWeight.Bold, letterSpacing = (-0.01).em)
+  val markHeight = with(LocalDensity.current) { style.fontSize.toDp() } * 0.86f
   Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-    Image(rememberVectorPainter(Icons.Monogram), contentDescription = null, modifier = Modifier.size(dims.iconLarge + 8.dp))
-    Text("DwellPlay", style = type.heading.copy(fontWeight = FontWeight.SemiBold))
+    Image(rememberVectorPainter(Icons.Monogram), contentDescription = null, modifier = Modifier.height(markHeight).aspectRatio(Icons.MARK_ASPECT))
+    Spacer(Modifier.width(markHeight * 0.42f))
+    Text("DwellPlay", style = style, maxLines = 1)
   }
 }
 
@@ -170,9 +173,10 @@ fun CardRow(
   if (videos.isEmpty()) return
   val dims = LocalDims.current
   Column {
-    SectionHeader(title, Modifier.padding(horizontal = dims.gutter), action)
+    SectionHeader(title, Modifier.gutters(), action)
     Spacer(Modifier.height(dims.gap / 2))
-    LazyRow(contentPadding = PaddingValues(horizontal = dims.gutter), horizontalArrangement = Arrangement.spacedBy(dims.gap)) {
+    // Rows start clear of the car rail but scroll underneath its glass.
+    LazyRow(contentPadding = PaddingValues(start = gutterStart(), end = dims.gutter), horizontalArrangement = Arrangement.spacedBy(dims.gap)) {
       items(videos, key = { it.id }) { v -> MediaCard(v, progressOf(v), onClick = { onOpen(v, videos) }, onLongClick = onLongClick?.let { { it(v) } }) }
     }
   }

@@ -37,7 +37,7 @@ Phone targets remain at least 48dp, car targets at least 76dp. The car main tran
 
 ## Navigation and Home
 
-Home, Library, Search and Sources form the primary navigation. Settings is a secondary action in a phone header and a car rail footer. Phone navigation is a rounded inset dock, and car navigation is an inset dark strip. Selected items use graphite, neutral content and a small crimson marker. Shelves retain bare 16:9 artwork with thin crimson watch progress, title and subdued source metadata.
+Home, Library, Search and Sources form the primary navigation. Settings is a secondary action in a phone header and a car rail footer. Navigation follows the sibling apps' dock; see the 0.2.0 additions below. Shelves retain bare 16:9 artwork with thin crimson watch progress, title and subdued source metadata.
 
 ## Player
 
@@ -60,3 +60,17 @@ Short fades and restrained state transitions, roughly 150–250ms. No continuous
 ## Verification
 
 Build personal and store variants, run meaningful safety regressions, inspect phone portrait/landscape, Curvv-sized panoramic and narrower/portrait car layouts, and test navigation/queue/resume state transitions. DHU and actual Curvv checks need a connected phone; record any unavailable checks honestly.
+
+## 0.2.0 additions (3 October 2026)
+
+**Brand.** The mark from the chosen sketch (Desktop\dwellplay\Ideas.png), rebuilt as geometry in tools/icon/mark.py: italic slant 0.4, play angle 28.5 degrees, circular fillets, 99.4% overlap with the sketch. Launcher icon: white mark on crimson lit softly from the top left; debug builds invert it (crimson on near-black). Wordmark: the crimson mark beside "DwellPlay" in the heading style, bold, the mark at 0.86 of the font size.
+
+**Navigation.** Taken from the sibling apps (WearWise Wardrobe, WearWise Go, Vandana, Dueline) rather than invented: a floating pill sized to its tabs, icons only, the current tab a crimson pill that opens to show its name (240ms, cubic-bezier 0.22, 1, 0.36, 1). Wide windows turn it into a vertical capsule beside the content with the current tab as a crimson disc and Settings below a hairline. Content scrolls underneath both.
+
+**Liquid glass.** ui/LiquidGlass.kt. The browsing content is recorded into a graphics layer; each glass surface redraws it through an AGSL bevel shader (15dp bevel, up to 12dp of bend, hardest at the rim), a 5dp blur and a tone (saturation 1.25, brightness 0.82), then the ink tint at 58%, a 1dp rim light, a crimson inner glow and a soft drop shadow. No white glare. Android 12 and older, and Android Automotive OS, get the same surface without the bend at 92%. Measured on the Android Auto head unit: 1 to 3ms of GPU per frame.
+
+**Full screen.** The picture stays clear. Title at the top (Android Auto takes touches in both top corners, so nothing tappable goes there), and one glass bar along the bottom: previous, back 10, play or pause, forward 10, next, the seek line with times either side, picture options, leave full screen. Touches on the bar keep it from fading.
+
+**Seek bar.** The board's: a thin crimson line on a neutral track with a white thumb that grows under a finger.
+
+**Phone as remote.** While Android Auto is connected the phone player shows artwork, "Playing on the car screen" and the controls, never the picture.

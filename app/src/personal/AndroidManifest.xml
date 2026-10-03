@@ -7,9 +7,15 @@
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <!-- Its own task, so the phone and the car screen each keep a DwellPlay window. -->
         <activity
-            android:name=".MainActivity"
-            android:exported="true">
+            android:name=".CarActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:exported="true"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="false"
+            android:taskAffinity="${applicationId}.car"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.CAR_LAUNCHER" />

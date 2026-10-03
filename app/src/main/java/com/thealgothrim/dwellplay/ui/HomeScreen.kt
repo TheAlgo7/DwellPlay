@@ -55,15 +55,15 @@ fun HomeScreen(screen: Screen, nav: AppNav, actions: AppActions, railNavigation:
   val links = saved.filter { it.type == SourceType.STREAM }
   val nothingYet = phone.isEmpty() && saved.isEmpty() && sources.isEmpty() && continueWatching.isEmpty()
 
-  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = dims.gap, bottom = dims.section * 2), verticalArrangement = Arrangement.spacedBy(dims.section + if (screen.isCar) 0.dp else 8.dp)) {
-    item { HomeHeader(screen, showSettings = !screen.isCar || !railNavigation, onSettings = { actions.goTo(Tab.SETTINGS) }) }
+  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = dims.gap, bottom = dims.section * 2 + LocalChromeInsets.current.bottom), verticalArrangement = Arrangement.spacedBy(dims.section + if (screen.isCar) 0.dp else 8.dp)) {
+    item { HomeHeader(screen, showSettings = !railNavigation, onSettings = { actions.goTo(Tab.SETTINGS) }) }
     if (nothingYet) item { Welcome(access != PhoneVideos.Access.NONE, actions) }
     // Rows only exist when they have something in them, so empty ones leave no gaps.
     if (continueWatching.isNotEmpty()) item { CardRow("Continue watching", continueWatching, progressOf, actions.open, manage) }
     if (youtube.isNotEmpty()) item { CardRow("YouTube", youtube, progressOf, actions.open, manage) }
     if (phone.isNotEmpty()) item {
       CardRow(
-          "On ${Device.here}",
+          PhoneVideos.NAME,
           phone.take(24),
           progressOf,
           actions.open,
@@ -99,7 +99,7 @@ fun HomeScreen(screen: Screen, nav: AppNav, actions: AppActions, railNavigation:
     }
     if (links.isNotEmpty()) item { CardRow("Links", links, progressOf, actions.open, manage) }
     if (!nothingYet && access == PhoneVideos.Access.NONE) {
-      item { InlineNotice("Show the videos saved on ${Device.here} here too.", "Allow", actions.askPhoneAccess) }
+      item { InlineNotice("Show your ${PhoneVideos.NAME} here: the videos you put in ${PhoneVideos.FOLDER_LABEL} on ${Device.here}.", "Allow", actions.askPhoneAccess) }
     }
   }
 }
@@ -108,7 +108,7 @@ fun HomeScreen(screen: Screen, nav: AppNav, actions: AppActions, railNavigation:
 private fun HomeHeader(screen: Screen, showSettings: Boolean, onSettings: () -> Unit) {
   val dims = LocalDims.current
   val type = LocalType.current
-  BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = dims.gutter)) {
+  BoxWithConstraints(Modifier.fillMaxWidth().gutters()) {
     val statusInRow = screen.isCar && maxWidth >= 720.dp
     Column {
       Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -153,17 +153,17 @@ private fun ParkedStatus() {
 private fun Welcome(phoneAllowed: Boolean, actions: AppActions) {
   val dims = LocalDims.current
   val type = LocalType.current
-  Column(Modifier.padding(horizontal = dims.gutter).fillMaxWidth().panel(dims.sheetCorner).padding(dims.gap)) {
+  Column(Modifier.gutters().fillMaxWidth().panel(dims.sheetCorner).padding(dims.gap)) {
     Text("Your parked-screen media hub", style = type.hero)
     Spacer(Modifier.height(8.dp))
     Text(
-        if (Device.isCar) "Videos saved in this car, YouTube, your own server and stream links, on the big screen whenever you're parked. When you drive, your own videos can keep playing as sound."
-        else "Videos on this phone, YouTube, your own server and stream links, on the car's big screen whenever you're parked. When you drive, your own videos keep playing as sound.",
+        if (Device.isCar) "Your ${PhoneVideos.NAME}, YouTube, your own server and stream links, on the big screen whenever you're parked. When you drive, your own videos can keep playing as sound."
+        else "Your ${PhoneVideos.NAME} (${PhoneVideos.FOLDER_LABEL} on this phone), YouTube, your own server and stream links, on the car's big screen whenever you're parked. When you drive, your own videos keep playing as sound.",
         style = type.body.copy(color = Palette.Text2),
     )
     Spacer(Modifier.height(dims.gap))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(dims.gap / 2), verticalArrangement = Arrangement.spacedBy(dims.gap / 2)) {
-      if (!phoneAllowed) ActionButton(if (Device.isCar) "Show saved videos" else "Show phone videos", actions.askPhoneAccess, icon = Icons.Phone, primary = true)
+      if (!phoneAllowed) ActionButton("Show my ${PhoneVideos.NAME}", actions.askPhoneAccess, icon = Icons.Folder, primary = true)
       ActionButton("Add a YouTube link", { actions.dialog(AppDialog.AddYouTube) }, icon = Icons.Embed, primary = phoneAllowed)
       ActionButton("Connect Jellyfin", { actions.dialog(AppDialog.Jellyfin()) }, icon = Icons.Server)
     }
@@ -177,7 +177,7 @@ fun InlineNotice(text: String, action: String?, onAction: () -> Unit) {
   val dims = LocalDims.current
   val type = LocalType.current
   Row(
-      Modifier.padding(horizontal = dims.gutter).fillMaxWidth().panel(dims.corner).padding(horizontal = dims.gap, vertical = 10.dp),
+      Modifier.gutters().fillMaxWidth().panel(dims.corner).padding(horizontal = dims.gap, vertical = 10.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(Icons.Info, null, tint = Palette.Warning, modifier = Modifier.size(dims.icon))

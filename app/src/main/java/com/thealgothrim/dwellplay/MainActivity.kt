@@ -38,7 +38,7 @@ import kotlinx.coroutines.Job
  * parked app), or an Android Automotive OS car. It tells the player hub when it's visible and, on
  * Android Automotive OS, when driving restrictions are on; the hub's safety rules do the rest.
  */
-class MainActivity : ComponentActivity() {
+open class MainActivity : ComponentActivity() {
   private var screen by mutableStateOf(Screen.PHONE)
   private var restricted by mutableStateOf(false)
   private var visible = false
@@ -146,6 +146,7 @@ class MainActivity : ComponentActivity() {
             )
         AppGraph.hub.play(video)
         nav.playerOpen = true
+        if (screen == Screen.PHONE && CarScreens.projecting) AppGraph.hub.sendPictureToCar()
       }
       else ->
           // Android Auto reopens a parked app that has something playing with this action
@@ -168,7 +169,7 @@ class MainActivity : ComponentActivity() {
       }
       val library = AppGraph.library
       val native =
-          (library.data.value.recent + library.phone.value + library.folders.value.values.flatten() +
+          (library.history.value + library.phone.value + library.folders.value.values.flatten() +
               library.saved.value + library.shelves.value.values.flatMap { it.resume + it.latest })
               .filter { !it.isFolder && it.type != SourceType.YOUTUBE && it.ref !is MediaRef.YouTube }
               .distinctBy { it.id }

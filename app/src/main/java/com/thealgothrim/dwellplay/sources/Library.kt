@@ -23,7 +23,9 @@ import com.thealgothrim.dwellplay.data.LibraryData
 import com.thealgothrim.dwellplay.data.LibraryStore
 import com.thealgothrim.dwellplay.data.SecretBox
 import java.util.UUID
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -86,9 +88,17 @@ class Library(
   val saved: StateFlow<List<Video>> = store.data.map { it.saved }.stateIn(scope, SharingStarted.Eagerly, store.current.saved)
 
   /** Part-watched titles, newest first, including what a server says was started elsewhere. */
+  /**
+   * What was played lately, minus phone videos outside the DwellPlay folder: something played once
+   * from another folder must not resurface on the car screen through history or search.
+   */
+  val history: StateFlow<List<Video>> =
+      combine(store.data, _phone) { d, phone -> d.recent.filter { v -> v.type != SourceType.PHONE || phone.any { it.id == v.id } } }
+          .stateIn(scope, SharingStarted.Eagerly, emptyList())
+
   val continueWatching: StateFlow<List<Video>> =
-      combine(store.data, _shelves) { d, shelves ->
-            val mine = d.recent.filter { ResumeRules.fraction(d.progress[it.id]) != null }
+      combine(store.data, _shelves, history) { d, shelves, recent ->
+            val mine = recent.filter { ResumeRules.fraction(d.progress[it.id]) != null }
             val fromServers = shelves.values.flatMap { it.resume }.filter { v -> mine.none { it.id == v.id } }
             (mine + fromServers).take(16)
           }
@@ -116,17 +126,24 @@ class Library(
     }
   }
 
+  private var phoneScan: Job? = null
+
+  /** A newer request replaces a scan in flight, so a slow older scan can never overwrite its result. */
   fun refreshPhone() {
-    scope.launch {
-      phoneAccess.value = PhoneVideos.access(context)
-      _phone.value =
-          runCatching { PhoneVideos.scan(context) }
-              .onSuccess { Log.i(TAG, "Phone videos: ${it.size} (access ${phoneAccess.value})") }
-              .getOrElse {
-                Log.w(TAG, "Phone video scan failed", it)
+    phoneScan?.cancel()
+    phoneScan =
+        scope.launch {
+          phoneAccess.value = PhoneVideos.access(context)
+          _phone.value =
+              try {
+                PhoneVideos.scan(context).also { Log.i(TAG, "Phone videos: ${it.size} (access ${phoneAccess.value})") }
+              } catch (e: CancellationException) {
+                throw e
+              } catch (e: Exception) {
+                Log.w(TAG, "Phone video scan failed", e)
                 emptyList()
               }
-    }
+        }
   }
 
   fun refresh(source: Source) {
@@ -304,7 +321,7 @@ class Library(
         ?: _shelves.value.values.firstNotNullOfOrNull { s -> (s.resume + s.latest).firstOrNull { it.id == videoId } }
   }
 
-  private fun everythingLocal(): List<Video> = (_phone.value + _folders.value.values.flatten() + saved.value + store.current.recent).distinctBy { it.id }
+  private fun everythingLocal(): List<Video> = (_phone.value + _folders.value.values.flatten() + saved.value + history.value).distinctBy { it.id }
 
   suspend fun search(query: String): SearchResults = coroutineScope {
     val q = query.trim()

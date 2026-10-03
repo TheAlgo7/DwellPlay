@@ -44,7 +44,7 @@ fun SettingsScreen(screen: Screen) {
   val context = LocalContext.current
   var keyDraft by remember { mutableStateOf(prefs.youtubeKey) }
 
-  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(dims.gutter), verticalArrangement = Arrangement.spacedBy(dims.gap / 2)) {
+  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = gutterStart(), end = dims.gutter, top = dims.gutter, bottom = dims.gutter + LocalChromeInsets.current.bottom), verticalArrangement = Arrangement.spacedBy(dims.gap / 2)) {
     item { Text("Settings", style = type.hero) }
 
     item { Group("Playback") }

@@ -188,6 +188,26 @@ class PlayerHub(
   private data class Window(val screen: Screen, val visible: Boolean, val restricted: Boolean)
 
   private val windows = LinkedHashMap<Int, Window>()
+
+  private val _carWindow = MutableStateFlow(false)
+  /** DwellPlay is open and on show on a car screen, so a title picked on the phone can play there. */
+  val carWindow: StateFlow<Boolean> = _carWindow.asStateFlow()
+
+  private val _carPlayerWanted = MutableStateFlow(false)
+  /**
+   * Set when a title is picked on the phone while Android Auto is connected: the car window opens its
+   * player (now, or as soon as DwellPlay is opened there) and clears it. Like choosing a song on the
+   * phone while Spotify plays in the car.
+   */
+  val carPlayerWanted: StateFlow<Boolean> = _carPlayerWanted.asStateFlow()
+
+  fun sendPictureToCar() {
+    _carPlayerWanted.value = true
+  }
+
+  fun carPlayerOpened() {
+    _carPlayerWanted.value = false
+  }
   private var shown = false
   /** Debug builds: pretend every screen is under driving restrictions (the adb "drive" hook). */
   private var debugDriving = false
@@ -209,6 +229,7 @@ class PlayerHub(
   }
 
   private fun recompute() {
+    _carWindow.value = windows.values.any { it.screen != Screen.PHONE && it.visible && !it.restricted }
     vehicleAudio = windows.values.all { CarScreens.vehicleAllowsBackgroundAudio(context, it.screen) }
     val nowShown = !debugDriving && windows.values.any { it.visible && !it.restricted }
     if (nowShown == shown) return

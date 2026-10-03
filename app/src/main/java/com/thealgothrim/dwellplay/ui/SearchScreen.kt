@@ -67,7 +67,7 @@ fun SearchScreen(actions: AppActions) {
   val data by library.data.collectAsState()
   val progressOf = { v: Video -> ResumeRules.fraction(data.progress[v.id]) }
 
-  val local = remember(query, phone, saved) { if (query.isBlank()) emptyList() else LocalSearch.search(phone + saved + data.recent, query) }
+  val local = remember(query, phone, saved) { if (query.isBlank()) emptyList() else LocalSearch.search(phone + saved + AppGraph.library.history.value, query) }
 
   fun runSearch() {
     val q = query.trim()
@@ -93,7 +93,7 @@ fun SearchScreen(actions: AppActions) {
         // Stops short of Android Auto's Exit button, which would cover the clear button.
         modifier =
             Modifier.fillMaxWidth()
-                .padding(start = dims.gutter, end = dims.gutter + LocalHostCorners.current.end, top = dims.gap / 2, bottom = dims.gap / 2)
+                .padding(start = gutterStart(), end = dims.gutter + LocalHostCorners.current.end, top = dims.gap / 2, bottom = dims.gap / 2)
                 .focusRequester(focusRequester),
         textStyle = type.title,
         singleLine = true,
@@ -116,12 +116,12 @@ fun SearchScreen(actions: AppActions) {
     )
     val r = results
     if (query.isBlank()) {
-      MessagePanel(Icons.Search, "Find anything", "Titles on ${com.thealgothrim.dwellplay.car.Device.here} as you type. Press search to ask YouTube and your Jellyfin servers too.", Modifier.fillMaxSize())
+      MessagePanel(Icons.Search, "Find anything", "Titles in your library as you type. Press search to ask YouTube and your Jellyfin servers too.", Modifier.fillMaxSize())
       return@Column
     }
-    LazyColumn(contentPadding = PaddingValues(bottom = dims.section * 2), verticalArrangement = Arrangement.spacedBy(dims.section)) {
+    LazyColumn(contentPadding = PaddingValues(bottom = dims.section * 2 + LocalChromeInsets.current.bottom), verticalArrangement = Arrangement.spacedBy(dims.section)) {
       item {
-        Row(Modifier.padding(horizontal = dims.gutter), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.gutters(), verticalAlignment = Alignment.CenterVertically) {
           ActionButton(if (searching) "Searching" else "Search YouTube and servers", ::runSearch, icon = Icons.Search, primary = r == null, enabled = !searching)
           if (searching) {
             Spacer(Modifier.width(12.dp))

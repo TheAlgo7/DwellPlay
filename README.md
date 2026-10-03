@@ -4,17 +4,19 @@ Your parked-screen media hub: videos on your phone, YouTube, your own Jellyfin s
 
 One Android app for three screens: the phone, the car screen through Android Auto, and cars that run Android Automotive OS (Google built-in).
 
-## Dark Cinema
+## Dark Cinema (0.2.0)
 
-The 1 October 2026 refinement uses near-black graphite layers, restrained dark translucent controls, neutral transport buttons and small Algothrim crimson accents. Artwork remains the card; cached artwork adds a quiet atmosphere around the player controls. The direction is recorded in [DESIGN.md](DESIGN.md).
+Near-black graphite layers, artwork as the card, and Algothrim crimson only for intent: progress, the current tab, the main actions. The direction is recorded in [DESIGN.md](DESIGN.md).
 
-Home, Library, Search and Sources are the four primary destinations. Settings is in the phone Home header and the car rail footer; compact car windows also expose it in Home. Navigation becomes an inset dock when a rail would leave too little room.
-
-The player recomposes for the window: panoramic video and controls sit side by side, while phone portrait and narrower car windows stack them. The active video stage stays visible while metadata and the expandable queue scroll. YouTube's controls remain outside its official player; layout changes preserve its current position and play/pause intent.
+- **The mark.** An italic D whose stem stands apart and whose counter is a play button. It is built from geometry in [tools/icon/mark.py](tools/icon/mark.py) (two angles and circular fillets, fitted to the chosen sketch), which writes the launcher icon (white on crimson; debug builds are crimson on black), the themed icon, the status bar icon, the Android 12+ splash and the in-app wordmark.
+- **Navigation from the sibling apps.** The WearWise, Vandana and Dueline dock: a compact floating pill of icon tabs where the current tab opens into a crimson pill with its name. On wide car screens it stands on its side as a capsule beside the content. Both are liquid glass: a GPU shader bends what scrolls underneath along the rim (Android 13+), with the same tuning as the web apps.
+- **The player.** Panoramic screens put the video beside a control panel that keeps clear of Android Auto's Exit corner; phones stack them and the panel fills the space under the video. Full screen keeps the picture clear: the title at the top, one glass bar along the bottom with transport, the seek line and its times.
+- **The DwellPlay folder.** Phone videos come only from **Movies › DwellPlay**, like an app keeping its own folder. The rest of the phone stays out of sight unless a folder is added in Sources, so passengers never see personal videos. History and search follow the same rule.
+- **The phone as the remote.** While Android Auto is connected, a video picked on the phone plays on the car screen, which opens its player by itself, and the phone shows the controls without the picture.
 
 ## Screenshots and verification
 
-The screenshots below are historical captures from 30 September 2026, before the Dark Cinema refinement. The Android Auto images came from a real phone connected to the Desktop Head Unit, not the actual Curvv. Checks for the redesigned build use emulators and simulated displays; see [docs/testing.md](docs/testing.md) for the verification steps and results. The redesign still needs a fresh phone/DHU test, and the actual Curvv remains unproven.
+The screenshots below are historical captures from 30 September 2026, before the Dark Cinema refinement and the 0.2.0 look. The Android Auto images came from a real phone connected to the Desktop Head Unit, not the actual Curvv. Checks for the redesigned build use emulators and simulated displays; see [docs/testing.md](docs/testing.md) for the verification steps and results. The redesign still needs a fresh phone/DHU test, and the actual Curvv remains unproven.
 
 ![DwellPlay on Android Auto: YouTube's own player at full height, DwellPlay's controls in a rail beside it](docs/readme/android-auto-youtube.png)
 
@@ -40,7 +42,7 @@ On Android Automotive OS the car itself takes over while driving (its Drive View
 
 | Source | How |
 |---|---|
-| Videos on the phone | Read from the phone's own library. Through Android Auto the app runs on the phone, so these play on the car screen with no copying. |
+| Videos on the phone | The DwellPlay folder (Movies › DwellPlay), read from the phone's own library. Nothing else on the phone appears. Through Android Auto the app runs on the phone, so these play on the car screen with no copying. |
 | A folder or USB drive | Picked with the system file picker. Only that folder is read. |
 | YouTube | Only in YouTube's official embedded player. Share a video or playlist from the YouTube app to DwellPlay, or paste a link. Search works once a free YouTube Data API key is added in Settings. |
 | Jellyfin | Sign in to your own server. It sends the original file when the car can play it and converts it on the fly when it can't. |

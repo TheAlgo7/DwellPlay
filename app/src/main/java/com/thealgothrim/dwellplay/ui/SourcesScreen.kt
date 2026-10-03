@@ -44,15 +44,15 @@ fun SourcesScreen(actions: AppActions) {
   val access by library.phoneAccess.collectAsState()
   val prefs by AppGraph.settings.prefs.collectAsState()
 
-  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(dims.gutter), verticalArrangement = Arrangement.spacedBy(dims.gap / 2)) {
+  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = gutterStart(), end = dims.gutter, top = dims.gutter, bottom = dims.gutter + LocalChromeInsets.current.bottom), verticalArrangement = Arrangement.spacedBy(dims.gap / 2)) {
     item { Text("Your sources", style = type.hero) }
     item {
       SourceLine(
-          Icons.Phone,
-          Device.label,
+          Icons.Folder,
+          PhoneVideos.NAME,
           when (access) {
-            PhoneVideos.Access.ALL -> "${phone.size} videos"
-            PhoneVideos.Access.SOME -> "${phone.size} videos you picked"
+            PhoneVideos.Access.ALL -> "${phone.size} videos in ${PhoneVideos.FOLDER_LABEL}"
+            PhoneVideos.Access.SOME -> "${phone.size} videos you picked, from ${PhoneVideos.FOLDER_LABEL}"
             PhoneVideos.Access.NONE -> "Not allowed yet"
           },
       ) {

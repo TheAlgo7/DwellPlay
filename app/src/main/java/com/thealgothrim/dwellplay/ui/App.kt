@@ -3,9 +3,15 @@ package com.thealgothrim.dwellplay.ui
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.car.app.connection.CarConnection
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -16,12 +22,16 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -29,11 +39,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,14 +57,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.thealgothrim.dwellplay.AppGraph
+import com.thealgothrim.dwellplay.car.CarScreens
 import com.thealgothrim.dwellplay.core.model.SourceType
 import com.thealgothrim.dwellplay.core.model.Video
 import com.thealgothrim.dwellplay.core.policy.Screen
@@ -110,6 +127,9 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
   val hub = AppGraph.hub
   val library = AppGraph.library
   val now by hub.now.collectAsState()
+  val connection by CarScreens.connection.collectAsState()
+  // While Android Auto is connected the phone is the remote and the picture belongs to the car.
+  val pictureOnCar = screen == Screen.PHONE && (connection == CarConnection.CONNECTION_TYPE_PROJECTION || CarScreens.pretendProjecting)
 
   val phonePermission =
       rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { library.refreshPhone() }
@@ -121,7 +141,7 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
         }
       }
   val actions =
-      remember(nav) {
+      remember(nav, screen) {
         AppActions(
             open = { video, queue ->
               if (video.isFolder && video.type == SourceType.JELLYFIN) {
@@ -133,6 +153,7 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
               } else {
                 hub.play(video, queue)
                 nav.playerOpen = true
+                if (screen == Screen.PHONE && CarScreens.projecting) hub.sendPictureToCar()
               }
             },
             askPhoneAccess = { phonePermission.launch(PhoneVideos.permissions()) },
@@ -142,10 +163,27 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
         )
       }
 
+  // The car window opens its player for a title picked on the phone.
+  if (screen.isCar) {
+    val wanted by hub.carPlayerWanted.collectAsState()
+    LaunchedEffect(wanted, now) {
+      if (wanted && now != null) {
+        nav.playerOpen = true
+        nav.dialog = null
+        hub.carPlayerOpened()
+      }
+    }
+  }
+  // Leaving the phone's remote never stops what the car is showing.
+  val leavePlayer = {
+    if (!pictureOnCar) hub.leftPlayerScreen()
+    nav.playerOpen = false
+  }
+
   BackHandler(enabled = nav.playerOpen || nav.browse.isNotEmpty() || nav.tab != Tab.HOME) {
     when {
       nav.playerOpen -> {
-        hub.leftPlayerScreen()
+        leavePlayer()
         nav.playerOpen = false
       }
       nav.tab == Tab.LIBRARY && nav.browse.isNotEmpty() -> nav.browse.removeAt(nav.browse.lastIndex)
@@ -153,40 +191,60 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
     }
   }
 
-  BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Canvas).windowInsetsPadding(WindowInsets.safeDrawing)) {
+  // Browsing content runs under the gesture bar; the floating chrome and the player keep clear of it.
+  // The keyboard still pushes everything up.
+  BoxWithConstraints(
+      Modifier.fillMaxSize().background(Palette.Canvas)
+          .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+          .windowInsetsPadding(WindowInsets.ime)
+  ) {
     // A portrait car needs its width for content. Only a roomy landscape window gets the rail.
     // Short windows also use the dock, so the pinned Settings action never squeezes a tab's target.
     val roomForRail = maxHeight >= if (screen.isCar) 360.dp else 240.dp
     val wide = roomForRail && if (screen.isCar) maxWidth >= 840.dp && maxWidth > maxHeight
         else maxWidth >= 840.dp || (maxWidth > maxHeight && maxWidth >= 600.dp)
     val current = now
+    val density = LocalDensity.current
+    val corners = LocalHostCorners.current
+    // Height of whatever floats at the bottom (mini player, dock), so lists can scroll clear of it.
+    var chromeHeight by remember { mutableStateOf(0.dp) }
     if (nav.playerOpen && current != null) {
-      PlayerScreen(
-          screen = screen,
-          wide = wide,
-          onClose = {
-            hub.leftPlayerScreen()
-            nav.playerOpen = false
-          },
-          actions = actions,
-      )
+      Box(Modifier.windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))) {
+        PlayerScreen(screen = screen, wide = wide, onClose = leavePlayer, actions = actions, pictureOnCar = pictureOnCar)
+      }
     } else {
-      if (wide) {
-        Row(Modifier.fillMaxSize()) {
-          NavRail(nav)
-          Column(Modifier.weight(1f).fillMaxHeight()) {
-            Box(Modifier.weight(1f)) { TabContent(nav, screen, actions, railNavigation = true) }
-            if (current != null) MiniPlayer(onOpen = { nav.playerOpen = true })
-          }
-        }
-      } else {
-        Column(Modifier.fillMaxSize()) {
+      val backdrop = rememberBackdrop()
+      val railInset = if (wide) RailMargin + LocalDims.current.touch + RailPadding * 2 else 0.dp
+      CompositionLocalProvider(LocalChromeInsets provides ChromeInsets(start = railInset, bottom = chromeHeight)) {
+        // The navigation floats over this, and its glass bends what scrolls underneath.
+        Column(Modifier.fillMaxSize().backdropSource(backdrop).background(Palette.Canvas)) {
           // On compact projected windows, reserve both host corners for every browsing screen.
-          Spacer(Modifier.height(LocalHostCorners.current.height))
-          Box(Modifier.weight(1f)) { TabContent(nav, screen, actions, railNavigation = false) }
-          if (current != null) MiniPlayer(onOpen = { nav.playerOpen = true })
-          BottomBar(nav)
+          if (!wide) Spacer(Modifier.height(corners.height))
+          Box(Modifier.weight(1f)) { TabContent(nav, screen, actions, railNavigation = wide) }
         }
+      }
+      if (wide) {
+        // Android Auto puts its own back arrow in the top-left corner: the rail stays below it.
+        Box(
+            Modifier.fillMaxHeight().windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))
+                .padding(start = RailMargin, top = corners.height + 12.dp, bottom = 12.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+          NavRail(nav, backdrop)
+        }
+      }
+      Column(
+          Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(start = railInset)
+              .onSizeChanged { chromeHeight = with(density) { it.height.toDp() } }
+              .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)),
+          horizontalAlignment = Alignment.CenterHorizontally,
+      ) {
+        if (current != null) {
+          MiniPlayer(backdrop, onOpen = { nav.playerOpen = true })
+          Spacer(Modifier.height(10.dp))
+        }
+        if (!wide) Dock(nav, backdrop)
+        Spacer(Modifier.height(if (wide) 16.dp else 14.dp))
       }
     }
 
@@ -195,7 +253,7 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
     if (!restricted) nav.dialog?.let { d -> DialogHost(d, onDismiss = { nav.dialog = null }, actions = actions) }
 
     MessageBar(
-        Modifier.align(Alignment.BottomCenter).padding(bottom = if (wide || nav.playerOpen) 24.dp else LocalDims.current.touch + 44.dp),
+        Modifier.align(Alignment.BottomCenter).padding(bottom = if (nav.playerOpen) 24.dp else chromeHeight + 8.dp),
         visible = !nav.playerOpen || current?.isYouTube != true,
     )
 
@@ -224,110 +282,127 @@ private fun TabContent(nav: AppNav, screen: Screen, actions: AppActions, railNav
   }
 }
 
+private val RailMargin = 16.dp
+private val RailPadding = 8.dp
+
+/** WearWise's label slide: 240ms on its own curve, the label trailing the pill by 40ms. */
+private val Glide = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
+
+/**
+ * Wide windows (the Curvv's panel, landscape phones): the dock turned on its side. A glass capsule
+ * of icon tabs beside the content, the current one a crimson disc, Settings below a hairline.
+ */
 @Composable
-private fun NavRail(nav: AppNav) {
+private fun NavRail(nav: AppNav, backdrop: Backdrop) {
   val dims = LocalDims.current
-  Column(
-      Modifier.width(dims.rail).fillMaxHeight().padding(horizontal = 8.dp, vertical = 12.dp)
-          .chrome(dims.sheetCorner).padding(horizontal = 4.dp, vertical = 8.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-  ) {
-    // Android Auto puts its own back arrow in this corner: the tabs start below it.
-    Spacer(Modifier.height(LocalHostCorners.current.height))
+  Glass(backdrop, corner = 999.dp) {
     Column(
-        Modifier.weight(1f).verticalScroll(rememberScrollState()),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        Modifier.padding(RailPadding).verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-      for (tab in PrimaryTabs) NavItem(tab, selected = nav.tab == tab) { nav.tab = tab }
+      for (tab in PrimaryTabs) RailItem(tab, selected = nav.tab == tab) { nav.tab = tab }
+      Box(Modifier.padding(vertical = 4.dp).width(dims.touch / 2).height(1.dp).background(Palette.Hairline))
+      RailItem(Tab.SETTINGS, selected = nav.tab == Tab.SETTINGS) { nav.tab = Tab.SETTINGS }
     }
-    Spacer(Modifier.height(8.dp))
-    Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(1.dp).background(Palette.Hairline))
-    Spacer(Modifier.height(4.dp))
-    NavItem(Tab.SETTINGS, selected = nav.tab == Tab.SETTINGS) { nav.tab = Tab.SETTINGS }
   }
 }
 
 @Composable
-private fun BottomBar(nav: AppNav) {
+private fun RailItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
   val dims = LocalDims.current
-  val car = LocalScreen.current.isCar
-  BoxWithConstraints(
-      Modifier.fillMaxWidth().padding(horizontal = dims.gutter, vertical = if (car) 12.dp else 8.dp),
+  val fill by animateColorAsState(if (selected) Palette.Accent else Color.Transparent, tween(220, easing = Glide), label = "rail fill")
+  val tint by animateColorAsState(if (selected) Palette.OnAccent else Palette.Text2, tween(200), label = "rail tint")
+  Box(
+      Modifier.size(dims.touch).clip(CircleShape).background(fill)
+          .clickable(role = Role.Tab, onClick = onClick)
+          .semantics { this.selected = selected },
       contentAlignment = Alignment.Center,
   ) {
-    val minimumWidth = dims.touch * PrimaryTabs.size + 4.dp * (PrimaryTabs.size - 1) + 12.dp
-    val scroll = maxWidth < minimumWidth
+    Icon(tab.icon, contentDescription = tab.label, tint = tint, modifier = Modifier.size(dims.icon))
+  }
+}
+
+/**
+ * The dock from WearWise, Go, Vandana and Dueline: a compact glass pill of icon tabs, sized to its
+ * contents, where the current tab opens into a crimson pill with its name.
+ */
+@Composable
+private fun Dock(nav: AppNav, backdrop: Backdrop) {
+  Glass(backdrop, corner = 999.dp, modifier = Modifier.padding(horizontal = 8.dp)) {
+    // An unusually narrow window scrolls the tabs rather than shrinking their targets.
     Row(
-        Modifier.widthIn(max = if (car) 720.dp else 560.dp).fillMaxWidth()
-            .chrome(dims.sheetCorner + 4.dp).padding(6.dp)
-            .then(if (scroll) Modifier.horizontalScroll(rememberScrollState()) else Modifier),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        Modifier.padding(6.dp).horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-      for (tab in PrimaryTabs) {
-        // Fixed targets in an unusually narrow window; ordinary docks keep all four evenly spaced.
-        // Text semantics retain the complete destination name even if a large font is ellipsized.
-        val itemModifier = if (scroll) Modifier.width(dims.touch) else Modifier.weight(1f)
-        NavItem(tab, selected = nav.tab == tab, modifier = itemModifier) { nav.tab = tab }
-      }
+      for (tab in PrimaryTabs) DockItem(tab, selected = nav.tab == tab) { nav.tab = tab }
     }
   }
 }
 
 @Composable
-private fun NavItem(tab: Tab, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun DockItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
   val dims = LocalDims.current
   val type = LocalType.current
   val car = LocalScreen.current.isCar
-  val tint = if (selected) Palette.Text else Palette.Text2
-  Column(
-      modifier
-          .fillMaxWidth()
-          .defaultMinSize(minWidth = dims.touch, minHeight = dims.touch)
-          .clip(RoundedCornerShape(dims.corner + 4.dp))
-          .background(if (selected) Palette.Surface else Color.Transparent)
+  val fill by animateColorAsState(if (selected) Palette.Accent else Color.Transparent, tween(220, easing = Glide), label = "dock fill")
+  val tint by animateColorAsState(if (selected) Palette.OnAccent else Palette.Text2, tween(200), label = "dock tint")
+  Row(
+      Modifier.height(dims.touch).defaultMinSize(minWidth = dims.touch).clip(CircleShape).background(fill)
           .clickable(role = Role.Tab, onClick = onClick)
           .semantics { this.selected = selected }
-          .padding(vertical = 4.dp, horizontal = 2.dp),
-      horizontalAlignment = Alignment.CenterHorizontally,
-      verticalArrangement = Arrangement.Center,
+          .padding(horizontal = if (car) 22.dp else 13.dp),
+      verticalAlignment = Alignment.CenterVertically,
+      horizontalArrangement = Arrangement.Center,
   ) {
-    Icon(tab.icon, contentDescription = null, tint = tint, modifier = Modifier.size(dims.icon))
-    Spacer(Modifier.height(2.dp))
-    Text(tab.label, style = (if (car) type.meta else type.small).copy(color = tint), maxLines = 1, overflow = TextOverflow.Ellipsis)
-    Spacer(Modifier.height(3.dp))
-    Box(Modifier.width(16.dp).height(3.dp).clip(RoundedCornerShape(2.dp)).background(if (selected) Palette.Accent else Color.Transparent))
+    // The visible name speaks for the current tab; the others are named by their icon.
+    Icon(tab.icon, contentDescription = if (selected) null else tab.label, tint = tint, modifier = Modifier.size(dims.icon))
+    AnimatedVisibility(
+        selected,
+        enter = expandHorizontally(tween(240, 40, Glide), expandFrom = Alignment.Start) + fadeIn(tween(160, 60)),
+        exit = shrinkHorizontally(tween(200, easing = Glide), shrinkTowards = Alignment.Start) + fadeOut(tween(120)),
+    ) {
+      Text(
+          tab.label,
+          style = (if (car) type.button else type.button.copy(fontSize = 14.sp)).copy(color = Palette.OnAccent, fontWeight = FontWeight.SemiBold),
+          maxLines = 1,
+          modifier = Modifier.padding(start = if (car) 10.dp else 8.dp),
+      )
+    }
   }
 }
 
-/** What's playing, one line above the navigation, when the player screen is closed. */
+/** What's playing, a glass bar above the dock, when the player screen is closed. */
 @Composable
-private fun MiniPlayer(onOpen: () -> Unit) {
+private fun MiniPlayer(backdrop: Backdrop, onOpen: () -> Unit) {
   val hub = AppGraph.hub
   val dims = LocalDims.current
   val type = LocalType.current
   val now by hub.now.collectAsState()
   val ui by hub.ui.collectAsState()
   val np = now ?: return
-  Row(
-      Modifier.padding(horizontal = dims.gutter, vertical = 4.dp).fillMaxWidth()
-          .chrome(dims.sheetCorner).defaultMinSize(minHeight = dims.touch)
-          .clickable(onClick = onOpen).padding(horizontal = dims.gap / 2, vertical = 6.dp),
-      verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Artwork(np.video, Modifier.height(dims.touch - 12.dp).aspectRatio(16f / 9f))
-    Spacer(Modifier.width(dims.gap / 2))
-    Column(Modifier.weight(1f)) {
-      Text(np.video.title, style = type.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      val status =
-          when {
-            np.isYouTube && !ui.playing -> "YouTube · open to play"
-            ui.playing -> "Playing · ${formatClock(ui.positionMs)}"
-            else -> "Paused · ${formatClock(ui.positionMs)}"
-          }
-      Text(status, style = type.meta, maxLines = 1)
+  val car = LocalScreen.current.isCar
+  Glass(backdrop, corner = dims.sheetCorner, modifier = Modifier.padding(horizontal = dims.gutter).widthIn(max = if (car) 760.dp else 560.dp).fillMaxWidth()) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(dims.sheetCorner)).clickable(onClick = onOpen).padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Artwork(np.video, Modifier.height(dims.touch - 4.dp).aspectRatio(16f / 9f))
+      Spacer(Modifier.width(dims.gap))
+      Column(Modifier.weight(1f)) {
+        Text(np.video.title, style = type.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        val status =
+            when {
+              np.isYouTube && !ui.playing -> "YouTube · open to play"
+              ui.playing -> "Playing · ${formatClock(ui.positionMs)}"
+              else -> "Paused · ${formatClock(ui.positionMs)}"
+            }
+        Text(status, style = type.meta, maxLines = 1)
+      }
+      if (!np.isYouTube) IconAction(if (ui.playing) Icons.Pause else Icons.Play, if (ui.playing) "Pause" else "Play", onClick = { hub.togglePlay() })
+      IconAction(Icons.Close, "Stop and close", onClick = { hub.close() }, tint = Palette.Text2)
     }
-    if (!np.isYouTube) IconAction(if (ui.playing) Icons.Pause else Icons.Play, if (ui.playing) "Pause" else "Play", onClick = { hub.togglePlay() })
-    IconAction(Icons.Close, "Stop and close", onClick = { hub.close() })
   }
 }
 

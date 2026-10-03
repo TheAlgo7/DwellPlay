@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
  *   adb shell am broadcast $R -a jellyfin --es url https://demo.jellyfin.org/stable --es user demo --es password ""
  *   adb shell am broadcast $R -a drive --ez on true                          (pretend the car moves / parks again)
  *   adb shell am broadcast $R -a car --ez on true                            (a second display counts as Android Auto's)
+ *   adb shell am broadcast $R -a only --es files "a.mp4|b.mp4"                (phone videos: only these files; "" for all)
  *   adb shell am broadcast $R -a resume | toggle | close | convert | state
  */
 class DebugReceiver : BroadcastReceiver() {
@@ -60,6 +61,12 @@ class DebugReceiver : BroadcastReceiver() {
           "car" -> {
             com.thealgothrim.dwellplay.car.CarScreens.pretendProjecting = intent.getBooleanExtra("on", true)
             Log.i(TAG, "car: second displays count as Android Auto = ${com.thealgothrim.dwellplay.car.CarScreens.pretendProjecting}")
+          }
+          "only" -> {
+            val files = intent.getStringExtra("files").orEmpty()
+            context.getSharedPreferences("debug", Context.MODE_PRIVATE).edit().putString("only_files", files.ifBlank { null }).commit()
+            library.refreshPhone()
+            Log.i(TAG, "only: ${files.split('|').count { it.isNotBlank() }} test files")
           }
           "convert" -> hub.askServerToConvert()
           "resume" -> hub.resumeVideo()

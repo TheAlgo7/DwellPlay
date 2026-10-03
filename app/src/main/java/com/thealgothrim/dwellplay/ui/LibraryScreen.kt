@@ -67,7 +67,7 @@ fun LibraryScreen(nav: AppNav, actions: AppActions) {
 
   val entries =
       listOf(
-          SourceEntry(PhoneVideos.SOURCE_ID, Device.label, SourceType.PHONE, phone.size),
+          SourceEntry(PhoneVideos.SOURCE_ID, PhoneVideos.NAME, SourceType.PHONE, phone.size),
           SourceEntry(YOUTUBE_SOURCE_ID, "YouTube", SourceType.YOUTUBE, saved.count { it.type == SourceType.YOUTUBE }),
           SourceEntry(STREAMS_SOURCE_ID, "Links", SourceType.STREAM, saved.count { it.type == SourceType.STREAM }),
       ) + sources.map { SourceEntry(it.id, it.name, it.type, folders[it.id]?.size) }
@@ -81,14 +81,18 @@ fun LibraryScreen(nav: AppNav, actions: AppActions) {
     val width = maxWidth
     if (width >= 720.dp) {
       Row(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.width(if (width >= 1200.dp) 340.dp else 260.dp).fillMaxHeight(), contentPadding = PaddingValues(dims.gap / 2)) {
+        val chrome = LocalChromeInsets.current
+        LazyColumn(
+            Modifier.width((if (width >= 1200.dp) 340.dp else 260.dp) + chrome.start).fillMaxHeight(),
+            contentPadding = PaddingValues(start = dims.gap / 2 + chrome.start, end = dims.gap / 2, top = dims.gap / 2, bottom = dims.gap / 2 + chrome.bottom),
+        ) {
           items(entries, key = { it.id }) { e -> SourceRow(e, e.id == selected.id) { select(e.id) } }
         }
         Box(Modifier.weight(1f).fillMaxHeight()) { SourceContent(selected, nav, actions) }
       }
     } else {
       Column(Modifier.fillMaxSize()) {
-        LazyRow(contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyRow(contentPadding = PaddingValues(start = gutterStart(), end = dims.gutter, top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           items(entries, key = { it.id }) { e -> SourceChip(e, e.id == selected.id) { select(e.id) } }
         }
         Box(Modifier.weight(1f)) { SourceContent(selected, nav, actions) }
@@ -149,7 +153,7 @@ private fun SourceContent(entry: SourceEntry, nav: AppNav, actions: AppActions) 
   when (entry.type) {
     SourceType.PHONE ->
         if (access == PhoneVideos.Access.NONE) {
-          MessagePanel(Icons.Phone, "Show the videos on ${Device.here}", "DwellPlay only reads your videos to list and play them. Nothing leaves ${Device.here}.", Modifier.fillMaxSize()) {
+          MessagePanel(Icons.Folder, "Show your ${PhoneVideos.NAME}", "DwellPlay lists only the videos in ${PhoneVideos.FOLDER_LABEL} on ${Device.here}. Nothing else appears, and nothing leaves ${Device.here}.", Modifier.fillMaxSize()) {
             ActionButton("Allow", actions.askPhoneAccess, primary = true)
           }
         } else {
@@ -198,13 +202,13 @@ private fun PhoneLibrary(phone: List<Video>, access: PhoneVideos.Access, actions
   Column(Modifier.fillMaxSize()) {
     if (access == PhoneVideos.Access.SOME) InlineNotice("Showing only the videos you picked.", "Allow all", actions.askPhoneAccess)
     if (folders.size > 1) {
-      LazyRow(contentPadding = PaddingValues(horizontal = dims.gutter, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      LazyRow(contentPadding = PaddingValues(start = gutterStart(), end = dims.gutter, top = 8.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         item { FilterChip("All", folder == null) { folder = null } }
         items(folders) { f -> FilterChip(f, folder == f) { folder = f } }
       }
     }
     if (shown.isEmpty()) {
-      MessagePanel(Icons.Phone, "No videos on ${Device.here} yet", "Downloaded music videos, recordings and clips show up here.", Modifier.fillMaxSize())
+      MessagePanel(Icons.Folder, "Your ${PhoneVideos.NAME} is empty", "Put videos in ${PhoneVideos.FOLDER_LABEL} on ${Device.here} with any file manager. Other folders can be added in Sources.", Modifier.fillMaxSize())
     } else {
       VideoGrid(shown, actions.open)
     }
@@ -236,7 +240,7 @@ fun VideoGrid(videos: List<Video>, open: (Video, List<Video>) -> Unit, onLongCli
   LazyVerticalGrid(
       columns = GridCells.Adaptive(minSize = cell),
       modifier = Modifier.fillMaxSize(),
-      contentPadding = PaddingValues(start = dims.gutter, end = dims.gutter, top = dims.gap / 2, bottom = dims.section * 2),
+      contentPadding = PaddingValues(start = gutterStart(), end = dims.gutter, top = dims.gap / 2, bottom = dims.section * 2 + LocalChromeInsets.current.bottom),
       horizontalArrangement = Arrangement.spacedBy(dims.gap),
       verticalArrangement = Arrangement.spacedBy(dims.gap),
   ) {
@@ -271,7 +275,7 @@ private fun ServerBrowser(entry: SourceEntry, nav: AppNav, actions: AppActions) 
   }
   Column(Modifier.fillMaxSize()) {
     if (target.parentId != null) {
-      Row(Modifier.fillMaxWidth().padding(horizontal = dims.gutter / 2), verticalAlignment = Alignment.CenterVertically) {
+      Row(Modifier.fillMaxWidth().padding(start = gutterStart() - dims.gutter / 2, end = dims.gutter / 2), verticalAlignment = Alignment.CenterVertically) {
         IconAction(Icons.Back, "Back", onClick = { nav.browse.removeAt(nav.browse.lastIndex) })
         Text(target.title, style = type.heading, maxLines = 1, overflow = TextOverflow.Ellipsis)
       }
