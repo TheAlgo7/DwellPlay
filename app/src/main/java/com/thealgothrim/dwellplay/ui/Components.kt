@@ -134,12 +134,12 @@ fun MediaCard(
         )
       }
       if (progress != null) {
-        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(Color(0x66000000))) {
-          Box(Modifier.fillMaxWidth(progress).height(4.dp).background(Palette.Accent))
+        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(3.dp).background(Palette.Scrim)) {
+          Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).height(3.dp).background(Palette.Accent))
         }
       }
     }
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(10.dp))
     Text(video.title, style = type.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
     Row(verticalAlignment = Alignment.CenterVertically) {
       Icon(video.type.icon(), null, tint = Palette.Text3, modifier = Modifier.size(dims.iconSmall).padding(end = 4.dp))
@@ -206,7 +206,7 @@ fun ActionButton(
       Icon(icon, null, tint = if (enabled) fg else Palette.Text3, modifier = Modifier.size(dims.icon))
       Spacer(Modifier.width(10.dp))
     }
-    Text(label, style = type.button.copy(color = if (enabled) fg else Palette.Text3), maxLines = 1)
+    Text(label, style = type.button.copy(color = if (enabled) fg else Palette.Text3), maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(vertical = 10.dp))
   }
 }
 
@@ -227,12 +227,13 @@ fun IconAction(
       modifier
           .size(size)
           .clip(CircleShape)
-          .background(if (filled) Palette.Accent else Color.Transparent)
+          .background(if (filled) Palette.SurfaceTop else Color.Transparent)
+          .then(if (filled) Modifier.border(1.dp, Palette.Hairline, CircleShape) else Modifier)
           .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
           .semantics { contentDescription = label },
       contentAlignment = Alignment.Center,
   ) {
-    Icon(icon, contentDescription = null, tint = if (!enabled) Palette.Text3 else if (filled) Palette.OnAccent else tint, modifier = Modifier.size(iconSize))
+    Icon(icon, contentDescription = null, tint = if (!enabled) Palette.Text3.copy(alpha = 0.45f) else tint, modifier = Modifier.size(iconSize))
   }
 }
 
@@ -270,3 +271,7 @@ fun Spinner(modifier: Modifier = Modifier) {
 /** A neutral surface block (no coloured strips: accent goes on content, not on boxes). */
 fun Modifier.panel(corner: Dp): Modifier =
     this.clip(RoundedCornerShape(corner)).background(Palette.Surface).border(1.dp, Palette.Hairline, RoundedCornerShape(corner))
+
+/** Chrome floats above content. The dark tint stays readable without a live backdrop blur. */
+fun Modifier.chrome(corner: Dp = 24.dp): Modifier =
+    this.clip(RoundedCornerShape(corner)).background(Palette.Glass).border(1.dp, Palette.Hairline, RoundedCornerShape(corner))

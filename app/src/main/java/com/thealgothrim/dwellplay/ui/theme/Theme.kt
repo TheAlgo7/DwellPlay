@@ -20,24 +20,26 @@ import androidx.compose.ui.unit.sp
 import com.thealgothrim.dwellplay.core.policy.Screen
 
 /**
- * The report's palette: near-black canvas, one teal accent, 4.5:1 or better for everything
- * readable (checked with the toolkit's colors.py). Safety states never rely on colour alone.
+ * Dark Cinema: graphite depth, neutral readable content, crimson for intent.
+ * The brand color is for progress and actions, not small text. Safety is never color alone.
  */
 object Palette {
-  val Canvas = Color(0xFF0B0D10)
-  val Surface = Color(0xFF161A1F)
-  val SurfaceHigh = Color(0xFF1E232A)
-  val SurfaceTop = Color(0xFF262C34)
-  val Hairline = Color(0xFF2A3038)
-  val Text = Color(0xFFF4F7FA)
-  val Text2 = Color(0xFFB4BDC8)
-  val Text3 = Color(0xFF8C96A3)
-  val Accent = Color(0xFF57D6C7)
-  val OnAccent = Color(0xFF03211E)
-  val AccentSoft = Color(0x2457D6C7)
+  val Canvas = Color(0xFF08090B)
+  val CanvasRaised = Color(0xFF101115)
+  val Surface = Color(0xFF17181C)
+  val SurfaceHigh = Color(0xFF222329)
+  val SurfaceTop = Color(0xFF2D2E35)
+  val Glass = Color(0xEB17181C)
+  val Hairline = Color(0x18F2F2F2)
+  val Text = Color(0xFFF2F2F2)
+  val Text2 = Color(0xFFA9ABB2)
+  val Text3 = Color(0xFF94969F)
+  val Accent = Color(0xFFC9183C)
+  val OnAccent = Text
+  val AccentSoft = Color(0x24C9183C)
   val Warning = Color(0xFFFFB85C)
   val Error = Color(0xFFFF6B6B)
-  val Scrim = Color(0xE60B0D10)
+  val Scrim = Color(0xE608090B)
 }
 
 /** Sizes that change between a phone and a car screen (Google's automotive numbers for the car). */
@@ -73,8 +75,8 @@ data class DwellType(
 private fun style(size: TextUnit, weight: FontWeight = FontWeight.Normal, line: TextUnit = size * 1.25f, color: Color = Palette.Text) =
     TextStyle(fontSize = size, fontWeight = weight, lineHeight = line, color = color)
 
-val CarDims = Dims(76.dp, 88.dp, 44.dp, 36.dp, 24.dp, 32.dp, 24.dp, 32.dp, 336.dp, 8.dp, 16.dp, 128.dp)
-val PhoneDims = Dims(48.dp, 64.dp, 28.dp, 24.dp, 20.dp, 16.dp, 12.dp, 24.dp, 232.dp, 8.dp, 16.dp, 88.dp)
+val CarDims = Dims(76.dp, 88.dp, 44.dp, 36.dp, 24.dp, 32.dp, 24.dp, 36.dp, 336.dp, 12.dp, 24.dp, 128.dp)
+val PhoneDims = Dims(48.dp, 72.dp, 28.dp, 24.dp, 20.dp, 20.dp, 12.dp, 28.dp, 248.dp, 12.dp, 24.dp, 88.dp)
 
 /** Car: 32sp headings, 28sp titles, 24sp is the floor for anything that matters. */
 val CarType =
@@ -85,7 +87,7 @@ val CarType =
         body = style(24.sp),
         meta = style(24.sp, color = Palette.Text2),
         button = style(24.sp, FontWeight.Medium),
-        small = style(22.sp, color = Palette.Text2),
+        small = style(24.sp, color = Palette.Text2),
     )
 
 val PhoneType =
@@ -93,9 +95,9 @@ val PhoneType =
         hero = style(28.sp, FontWeight.Medium),
         heading = style(22.sp, FontWeight.Medium),
         title = style(16.sp, FontWeight.Medium),
-        body = style(15.sp),
-        meta = style(13.sp, color = Palette.Text2),
-        button = style(15.sp, FontWeight.Medium),
+        body = style(16.sp),
+        meta = style(14.sp, color = Palette.Text2),
+        button = style(16.sp, FontWeight.Medium),
         small = style(12.sp, color = Palette.Text2),
     )
 

@@ -35,7 +35,8 @@ class SafetyMachine(
   }
 
   sealed interface Event {
-    data class Load(val descriptor: PlaybackDescriptor) : Event
+    /** Automatic queue advances must preserve the post-drive Resume gate. */
+    data class Load(val descriptor: PlaybackDescriptor, val automatic: Boolean = false) : Event
     data object UserPlay : Event
     data object UserPause : Event
     data class Hide(val reason: HideReason) : Event
@@ -83,12 +84,17 @@ class SafetyMachine(
               // A new title chosen while hidden (from the car's media screen while driving) plays as
               // sound only, and only if the rules allow it for that title.
               is State.Hidden -> hiddenStart(e.descriptor, s.reason)
+              is State.ResumePrompt ->
+                  if (e.automatic) startBehindResumePrompt(e.descriptor)
+                  else State.Watching(e.descriptor, playing = true) to listOf(Effect.Play)
               else -> State.Watching(e.descriptor, playing = true) to listOf(Effect.Play)
             }
         Event.UserPlay ->
             when (s) {
               is State.Watching -> s.copy(playing = true) to listOf(Effect.Play)
-              is State.ResumePrompt -> State.Watching(s.descriptor, playing = true) to listOf(Effect.Play)
+              // A notification or the car's media controls can resume sound without restoring the
+              // picture. Resume or choosing a title in the app remains a deliberate action.
+              is State.ResumePrompt -> startBehindResumePrompt(s.descriptor)
               // Play from the car's media controls while the picture is hidden.
               is State.Hidden -> hiddenStart(s.descriptor, s.reason)
               State.Idle -> s to emptyList()
@@ -164,7 +170,7 @@ class SafetyMachine(
   }
 
   /** Starting something while the picture is hidden: sound only, and only when allowed. */
-  private fun hiddenStart(descriptor: PlaybackDescriptor, reason: HideReason): Pair<State, List<Effect>> {
+  private fun hiddenStart(descriptor: PlaybackDescriptor, reason: HideReason): Pair<State.Hidden, List<Effect>> {
     val playback =
         SafetyPolicy.whenHidden(descriptor, reason, vehicleAllowsBackgroundAudio(), userAllowsBackgroundAudio())
     return if (playback == HiddenPlayback.AUDIO_ONLY) {
@@ -173,5 +179,11 @@ class SafetyMachine(
       State.Hidden(descriptor, reason, playback, wasPlaying = false) to
           listOf(if (playback == HiddenPlayback.STOPPED) Effect.StopAndUnload else Effect.Pause)
     }
+  }
+
+  /** Automatic queue advances and media transport controls leave the post-drive picture gated. */
+  private fun startBehindResumePrompt(descriptor: PlaybackDescriptor): Pair<State, List<Effect>> {
+    val (hidden, effects) = hiddenStart(descriptor, HideReason.DRIVING)
+    return State.ResumePrompt(descriptor, audioPlaying = hidden.playback == HiddenPlayback.AUDIO_ONLY) to effects
   }
 }

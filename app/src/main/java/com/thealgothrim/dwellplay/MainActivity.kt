@@ -1,10 +1,12 @@
 package com.thealgothrim.dwellplay
 
 import android.content.Intent
+import android.app.SearchManager
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.SystemBarStyle
@@ -13,12 +15,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.withStarted
 import com.thealgothrim.dwellplay.car.AutomotiveRestrictions
 import com.thealgothrim.dwellplay.car.CarScreens
 import com.thealgothrim.dwellplay.core.model.MediaRef
 import com.thealgothrim.dwellplay.core.model.SourceType
 import com.thealgothrim.dwellplay.core.model.Video
 import com.thealgothrim.dwellplay.core.policy.Screen
+import com.thealgothrim.dwellplay.core.search.LocalSearch
 import com.thealgothrim.dwellplay.sources.AddResult
 import com.thealgothrim.dwellplay.sources.PhoneVideos
 import com.thealgothrim.dwellplay.ui.AppMessages
@@ -27,6 +31,7 @@ import com.thealgothrim.dwellplay.ui.DwellApp
 import com.thealgothrim.dwellplay.ui.Tab
 import com.thealgothrim.dwellplay.ui.theme.DwellTheme
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 
 /**
  * The one activity, on whichever screen it's shown: the phone, Android Auto's car screen (as a
@@ -39,6 +44,7 @@ class MainActivity : ComponentActivity() {
   private var visible = false
   private var restrictions: AutomotiveRestrictions? = null
   private val nav = AppNav()
+  private var voiceRequest: Job? = null
   private val windowId: Int
     get() = System.identityHashCode(this)
 
@@ -93,6 +99,7 @@ class MainActivity : ComponentActivity() {
 
   override fun onNewIntent(intent: Intent) {
     super.onNewIntent(intent)
+    setIntent(intent)
     handleIntent(intent)
   }
 
@@ -107,7 +114,10 @@ class MainActivity : ComponentActivity() {
   private fun report() = AppGraph.hub.reportWindow(windowId, screen, visible, restricted)
 
   private fun handleIntent(intent: Intent?) {
+    voiceRequest?.cancel()
+    voiceRequest = null
     when (intent?.action) {
+      MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH -> playFromSearch(intent)
       // Shared from the YouTube app or a browser.
       Intent.ACTION_SEND -> {
         val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
@@ -141,6 +151,43 @@ class MainActivity : ComponentActivity() {
           // Android Auto reopens a parked app that has something playing with this action
           // (seen on the head unit): go straight to the player, which waits on "Resume video".
           if (intent?.action?.endsWith("MEDIA_SHOW_PLAYBACK_VIEW") == true && AppGraph.hub.now.value != null) nav.playerOpen = true
+    }
+  }
+
+  /** Legacy voice intents search the native inventory; YouTube requires its visible official player. */
+  private fun playFromSearch(intent: Intent) {
+    val query =
+        intent.getStringExtra(MediaStore.EXTRA_MEDIA_TITLE)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: intent.getStringExtra(SearchManager.QUERY).orEmpty().trim()
+    voiceRequest = lifecycleScope.launch {
+      // A cold launch must publish its screen/restrictions before playback is requested.
+      lifecycle.withStarted { report() }
+      if (query.isNotEmpty() && LocalSearch.tokens(query).isEmpty()) {
+        AppMessages.say("No matching video in your library.")
+        return@launch
+      }
+      val library = AppGraph.library
+      val native =
+          (library.data.value.recent + library.phone.value + library.folders.value.values.flatten() +
+              library.saved.value + library.shelves.value.values.flatMap { it.resume + it.latest })
+              .filter { !it.isFolder && it.type != SourceType.YOUTUBE && it.ref !is MediaRef.YouTube }
+              .distinctBy { it.id }
+      val video =
+          if (query.isEmpty()) {
+            AppGraph.hub.now.value?.video?.takeIf { it.type != SourceType.YOUTUBE && it.ref !is MediaRef.YouTube }
+                ?: native.firstOrNull()
+          } else {
+            native.firstOrNull { LocalSearch.normalize(it.title) == LocalSearch.normalize(query) }
+                ?: LocalSearch.search(native, query, limit = 1).firstOrNull()
+          }
+      if (video == null) {
+        AppMessages.say(if (query.isEmpty()) "No native videos are available to play." else "No matching video in your library.")
+        return@launch
+      }
+      AppGraph.hub.playFromSearch(video)
+      // Voice playback starts sound; opening the picture remains an in-app action.
+      nav.playerOpen = false
+      AppMessages.say("Selected ${video.title}")
     }
   }
 

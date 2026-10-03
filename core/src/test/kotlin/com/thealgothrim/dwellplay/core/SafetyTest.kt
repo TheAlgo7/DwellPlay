@@ -119,6 +119,154 @@ class SafetyTest {
   }
 
   @Test
+  fun park_autoNextOwnMedia_keepsResumePromptAndSound() {
+    val m = machine()
+    val next = ownFile.copy(videoId = "phone:2", uri = "content://next")
+    m.on(Event.Load(ownFile))
+    m.on(Event.Hide(HideReason.DRIVING))
+    m.on(Event.Show)
+    m.on(Event.Ended)
+
+    val effects = m.on(Event.Load(next, automatic = true))
+
+    assertNoPicture(effects)
+    assertEquals(listOf(Effect.ContinueAsAudio), effects)
+    assertEquals(State.ResumePrompt(next, audioPlaying = true), m.state)
+    assertEquals(listOf(Effect.Play), m.on(Event.ResumeTapped))
+    assertEquals(State.Watching(next, playing = true), m.state)
+  }
+
+  @Test
+  fun park_autoNextYouTube_keepsResumePromptAndStops() {
+    val m = machine()
+    m.on(Event.Load(ownFile))
+    m.on(Event.Hide(HideReason.DRIVING))
+    m.on(Event.Show)
+    m.on(Event.Ended)
+
+    val effects = m.on(Event.Load(youtube, automatic = true))
+
+    assertNoPicture(effects)
+    assertEquals(listOf(Effect.StopAndUnload), effects)
+    assertEquals(State.ResumePrompt(youtube, audioPlaying = false), m.state)
+  }
+
+  @Test
+  fun park_autoNextOwnMedia_pausesUnlessAudioIsAllowed() {
+    for ((vehicle, user, next) in listOf(Triple(false, true, ownFile), Triple(true, false, ownFile), Triple(true, true, notEligible))) {
+      val m = machine(vehicle, user)
+      m.on(Event.Load(ownFile))
+      m.on(Event.Hide(HideReason.DRIVING))
+      m.on(Event.Show)
+      m.on(Event.Ended)
+
+      val effects = m.on(Event.Load(next, automatic = true))
+
+      assertNoPicture(effects)
+      assertEquals(listOf(Effect.Pause), effects)
+      assertEquals(State.ResumePrompt(next, audioPlaying = false), m.state)
+    }
+  }
+
+  @Test
+  fun watching_autoNext_startsTheNextPicture() {
+    val m = machine()
+    m.on(Event.Load(ownFile))
+    m.on(Event.Ended)
+
+    assertEquals(listOf(Effect.Play), m.on(Event.Load(youtube, automatic = true)))
+    assertEquals(State.Watching(youtube, playing = true), m.state)
+  }
+
+  @Test
+  fun driving_autoNextOwnMedia_staysHiddenAsSound() {
+    val m = machine()
+    val next = ownFile.copy(videoId = "phone:2", uri = "content://next")
+    m.on(Event.Load(ownFile))
+    m.on(Event.Hide(HideReason.DRIVING))
+    m.on(Event.Ended)
+
+    val effects = m.on(Event.Load(next, automatic = true))
+
+    assertNoPicture(effects)
+    assertEquals(listOf(Effect.ContinueAsAudio), effects)
+    assertEquals(State.Hidden(next, HideReason.DRIVING, HiddenPlayback.AUDIO_ONLY, wasPlaying = true), m.state)
+    m.on(Event.Show)
+    assertEquals(State.ResumePrompt(next, audioPlaying = true), m.state)
+  }
+
+  @Test
+  fun driving_autoNextYouTube_stopsAndStaysHidden() {
+    val m = machine()
+    m.on(Event.Load(ownFile))
+    m.on(Event.Hide(HideReason.DRIVING))
+    m.on(Event.Ended)
+
+    val effects = m.on(Event.Load(youtube, automatic = true))
+
+    assertNoPicture(effects)
+    assertEquals(listOf(Effect.StopAndUnload), effects)
+    assertEquals(State.Hidden(youtube, HideReason.DRIVING, HiddenPlayback.STOPPED, wasPlaying = false), m.state)
+  }
+
+  @Test
+  fun park_mediaPlayResumesSound_withoutClearingResumePrompt() {
+    val m = machine()
+    m.on(Event.Load(ownFile))
+    m.on(Event.Hide(HideReason.DRIVING))
+    m.on(Event.Show)
+    m.on(Event.UserPause)
+
+    val effects = m.on(Event.UserPlay)
+
+    assertNoPicture(effects)
+    assertEquals(listOf(Effect.ContinueAsAudio), effects)
+    assertEquals(State.ResumePrompt(ownFile, audioPlaying = true), m.state)
+  }
+
+  @Test
+  fun park_mediaPlayNeverStartsYouTube_withoutResume() {
+    val m = machine()
+    m.on(Event.Load(youtube))
+    m.on(Event.Hide(HideReason.DRIVING))
+    m.on(Event.Show)
+
+    val effects = m.on(Event.UserPlay)
+
+    assertNoPicture(effects)
+    assertEquals(listOf(Effect.StopAndUnload), effects)
+    assertEquals(State.ResumePrompt(youtube, audioPlaying = false), m.state)
+  }
+
+  @Test
+  fun park_mediaPlayRechecksAudioPermission_withoutClearingResumePrompt() {
+    var soundAllowed = true
+    val m = SafetyMachine({ true }, { soundAllowed })
+    m.on(Event.Load(ownFile))
+    m.on(Event.Hide(HideReason.DRIVING))
+    m.on(Event.Show)
+    m.on(Event.UserPause)
+    soundAllowed = false
+
+    val effects = m.on(Event.UserPlay)
+
+    assertNoPicture(effects)
+    assertEquals(listOf(Effect.Pause), effects)
+    assertEquals(State.ResumePrompt(ownFile, audioPlaying = false), m.state)
+  }
+
+  @Test
+  fun park_explicitSelection_startsTheChosenPicture() {
+    val m = machine()
+    m.on(Event.Load(ownFile))
+    m.on(Event.Hide(HideReason.DRIVING))
+    m.on(Event.Show)
+
+    assertEquals(listOf(Effect.Play), m.on(Event.Load(youtube)))
+    assertEquals(State.Watching(youtube, playing = true), m.state)
+  }
+
+  @Test
   fun background_thenBack_needsNoPrompt() {
     val m = machine()
     m.on(Event.Load(ownFile))

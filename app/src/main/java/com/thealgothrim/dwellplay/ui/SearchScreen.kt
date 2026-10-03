@@ -97,7 +97,7 @@ fun SearchScreen(actions: AppActions) {
                 .focusRequester(focusRequester),
         textStyle = type.title,
         singleLine = true,
-        placeholder = { Text("Search videos, YouTube and your server", style = type.body.copy(color = Palette.Text3)) },
+        placeholder = { Text("Search your media", style = type.body.copy(color = Palette.Text3), maxLines = 1) },
         leadingIcon = { Icon(Icons.Search, null, modifier = Modifier.size(dims.icon)) },
         trailingIcon = {
           if (query.isNotEmpty()) IconAction(Icons.Close, "Clear", onClick = { query = ""; results = null })

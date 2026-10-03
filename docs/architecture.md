@@ -13,7 +13,7 @@ DwellPlay started from a research report (30 September 2026) that proposed three
 | YouTube needs the Data API. | Only search does. Shared links and playlists work with no key (titles come from YouTube's oEmbed endpoint). Search is switched on by adding a key, and asks only for videos whose owners allow embedding. |
 | A safety gate class. | A pure state machine with every transition unit tested, including the ones the report listed as manual release checks. |
 
-Kept from the report as it was: the palette and type sizes, the 1920x720 theater and rail layout, YouTube only through the official player, no Netflix or Prime playback, Jellyfin's direct play or transcode negotiation, and the platform's restriction signal as the only authority on "parked".
+Kept from the report: large car typography and targets, YouTube only through the official player, no Netflix or Prime playback, Jellyfin's direct play or transcode negotiation, and the platform's restriction signal as the only authority on "parked". On 1 October 2026 the Dark Cinema refinement replaced teal with restrained crimson and updated navigation and player composition without splitting the app.
 
 ## One app, three screens
 
@@ -23,7 +23,9 @@ Kept from the report as it was: the palette and type sizes, the 1920x720 theater
 - **Android Auto**: a display other than the phone's while Android Auto is projecting. Android Auto decides when a parked app may be shown and takes the screen away when the car moves.
 - **Android Automotive OS**: a car all the way through. `AutomotiveRestrictions` listens to `CarUxRestrictionsManager` and uses only `isRequiresDistractionOptimization`, as Google's guidance asks.
 
-The layout follows the window, not the device: a navigation rail and the theater and rail player on wide screens, a bottom bar and a stacked player on a phone. Car screens get car sizes (76dp touch targets, an 88dp play button, 24sp as the smallest text).
+The layout follows the window, not the device. Four primary destinations (Home, Library, Search and Sources) use an inset rail in roomy landscape windows and a floating dock elsewhere. Settings is a secondary action in Home and the rail footer. Unusually narrow docks scroll horizontally rather than reducing target size. Car screens retain car sizes (76dp targets, an 88dp play button, 24sp readable labels).
+
+The player uses approximately 70/30 video and controls on panoramic windows when minimum widths allow it. Portrait and narrower car windows stack a fixed video stage above independently scrolling controls and an expandable queue. Short windows use full screen, with adjacent controls for YouTube. Artwork atmosphere comes from a cached small still on a separate softened layer; no playing-frame analysis or blur of the controls is required. The graphite/crimson tokens and visual decisions are in [DESIGN.md](../DESIGN.md).
 
 Two adjustments apply only on Android Auto, both found on the head unit (details in [android-auto.md](android-auto.md)): the layout is computed at the head unit's own density rather than the 1.31 times denser one Android Auto hands a parked app, and nothing tappable sits in the two top corners where Android Auto draws its own back and Exit buttons.
 
@@ -80,9 +82,10 @@ Rules the tests pin down (`core/src/test/.../SafetyTest.kt`):
 - YouTube never becomes audio, whatever the car or the settings say.
 - Nothing pressed while the picture is hidden can bring the picture back. Pressing play from the car's media controls re-runs the rules, so something that may not play is paused again.
 - A drive always ends in the Resume prompt. Moving pictures never start by themselves.
+- Automatic next-title loading while Resume is pending retains that prompt and rechecks audio permission. External media play can resume eligible native sound without showing the picture; it cannot start YouTube. Choosing a title in the app or tapping Resume is a deliberate video action.
 - Leaving the app and then driving is treated as driving.
 
-On top of that, Android Automotive OS covers non-driving-safe apps with its own blocking screen, Android Auto removes a parked app from the car screen, and DwellPlay's own cover hides everything while restrictions are on. Three layers, and only the first two are the platform's.
+On top of that, Android Automotive OS covers non-driving-safe apps with its own blocking screen, Android Auto removes a parked app from the car screen, and DwellPlay's own opaque cover hides everything while restrictions are on. Dialogs use their own Android window, so they are not mounted during restrictions; their pending navigation state is retained for parking. Three layers, and only the first two are the platform's.
 
 ## YouTube, by the rules
 
@@ -90,7 +93,9 @@ Following YouTube's required minimum functionality:
 
 - The official IFrame player, loaded with `https://<application id>` as the page origin so YouTube receives the Referer it requires. No extracted streams, ever.
 - Nothing is drawn over the player. DwellPlay's controls sit beside it; in full screen they move to a slim column next to the picture.
+- In stacked layouts, only metadata and controls scroll; the official player remains in a fixed visible stage.
 - It plays only while visible. Closing the player screen, leaving the app or driving stops and unloads it.
+- A layout remount requests the hub's current position, playlist index, captions and play/pause intent, rather than replaying the original load. The hub rejects stale or restricted mount requests, and callbacks from a disposed or detached WebView are ignored.
 - Ads, controls and branding are untouched.
 - Owners who disallow embedding produce "allowed only on YouTube", with a button to open the YouTube app.
 

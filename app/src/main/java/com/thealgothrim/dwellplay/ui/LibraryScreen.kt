@@ -127,13 +127,13 @@ private fun SourceChip(e: SourceEntry, selected: Boolean, onClick: () -> Unit) {
       Modifier.clip(RoundedCornerShape(dims.corner))
           .background(if (selected) Palette.AccentSoft else Palette.Surface)
           .clickable(role = Role.Tab, onClick = onClick)
-          .defaultMinSize(minHeight = dims.touch - 8.dp)
+          .defaultMinSize(minHeight = dims.touch)
           .padding(horizontal = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(e.type.icon(), null, tint = if (selected) Palette.Accent else Palette.Text2, modifier = Modifier.size(dims.iconSmall))
     Spacer(Modifier.width(6.dp))
-    Text(e.name, style = type.button.copy(color = if (selected) Palette.Accent else Palette.Text), maxLines = 1)
+    Text(e.name, style = type.button.copy(color = Palette.Text), maxLines = 1)
   }
 }
 
@@ -219,11 +219,11 @@ fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
       Modifier.clip(RoundedCornerShape(dims.corner))
           .background(if (selected) Palette.AccentSoft else Palette.Surface)
           .clickable(role = Role.Tab, onClick = onClick)
-          .defaultMinSize(minHeight = dims.touch - 8.dp)
+          .defaultMinSize(minHeight = dims.touch)
           .padding(horizontal = 14.dp),
       contentAlignment = Alignment.Center,
   ) {
-    Text(label, style = type.button.copy(color = if (selected) Palette.Accent else Palette.Text), maxLines = 1)
+    Text(label, style = type.button.copy(color = Palette.Text), maxLines = 1)
   }
 }
 

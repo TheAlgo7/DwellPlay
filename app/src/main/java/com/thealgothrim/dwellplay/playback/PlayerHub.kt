@@ -12,6 +12,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.thealgothrim.dwellplay.car.CarScreens
@@ -91,7 +92,15 @@ class PlayerHub(
   )
 
   /** What the YouTube embed should have loaded. Null means unloaded (stopped, never playing in the background). */
-  data class YouTubeRequest(val videoId: String?, val playlistId: String?, val startSeconds: Int, val autoplay: Boolean, val captions: Boolean, val nonce: Long)
+  data class YouTubeRequest(
+      val videoId: String?,
+      val playlistId: String?,
+      val startSeconds: Int,
+      val autoplay: Boolean,
+      val captions: Boolean,
+      val nonce: Long,
+      val playlistIndex: Int = 0,
+  )
 
   /** The embed on screen, registered by its composable. */
   interface YouTubeHandle {
@@ -131,6 +140,7 @@ class PlayerHub(
   private var nonce = 0L
   private var ytPositionMs = 0L
   private var ytDurationMs = 0L
+  private var ytPlaylistIndex = 0
   private var serverSession: ServerPlayback? = null
   private var connecting = false
   private var startJob: Job? = null
@@ -148,6 +158,7 @@ class PlayerHub(
 
   // ---- Media3 connection ----
 
+  @androidx.annotation.OptIn(UnstableApi::class)
   fun connect() {
     if (_controller.value != null || connecting) return
     connecting = true
@@ -220,6 +231,12 @@ class PlayerHub(
     launchStart(list[index], list, index, convert = false, startAtMs = null)
   }
 
+  /** A voice command starts native media without dismissing a post-drive picture gate. */
+  fun playFromSearch(video: Video) {
+    if (video.isFolder || video.type == SourceType.YOUTUBE) return
+    launchStart(video, listOf(video), 0, convert = false, startAtMs = null, automatic = true)
+  }
+
   fun next() {
     val np = _now.value ?: return
     val d = np.descriptor
@@ -251,12 +268,12 @@ class PlayerHub(
     launchStart(np.video, np.queue, np.index, convert = true, startAtMs = currentPositionMs().takeIf { it > 0 })
   }
 
-  private fun launchStart(video: Video, queue: List<Video>, index: Int, convert: Boolean, startAtMs: Long?) {
+  private fun launchStart(video: Video, queue: List<Video>, index: Int, convert: Boolean, startAtMs: Long?, automatic: Boolean = false) {
     startJob?.cancel()
-    startJob = scope.launch { start(video, queue, index, convert, startAtMs) }
+    startJob = scope.launch { start(video, queue, index, convert, startAtMs, automatic) }
   }
 
-  private suspend fun start(video: Video, queue: List<Video>, index: Int, convert: Boolean, startAtMs: Long?) {
+  private suspend fun start(video: Video, queue: List<Video>, index: Int, convert: Boolean, startAtMs: Long?, automatic: Boolean) {
     savePosition()
     reportServerStopped()
     _problem.value = null
@@ -276,7 +293,13 @@ class PlayerHub(
         }
     _now.value = NowPlaying(video, d, queue, index)
     library.markPlayed(video)
-    val effects = machine.on(Event.Load(d))
+    var effects = machine.on(Event.Load(d, automatic = automatic))
+    // A first load may arrive while the activity is already restricted: Idle has no descriptor
+    // for the earlier Hide event. Apply the current window policy before publishing playback.
+    if (!shown && machine.state is SafetyMachine.State.Watching) {
+      val driving = debugDriving || windows.values.any { it.restricted || it.screen != Screen.PHONE }
+      effects = machine.on(Event.Hide(if (driving) HideReason.DRIVING else HideReason.BACKGROUND))
+    }
     when (d) {
       is PlaybackDescriptor.Native -> {
         youtubeHandle?.stop()
@@ -307,6 +330,7 @@ class PlayerHub(
         }
         ytPositionMs = d.startSeconds * 1000L
         ytDurationMs = video.durationMs ?: 0
+        ytPlaylistIndex = 0
         _loading.value = false
         if (Effect.StopAndUnload in effects) {
           _youtube.value = null
@@ -321,11 +345,7 @@ class PlayerHub(
   }
 
   fun togglePlay() {
-    val playing =
-        when (val s = machine.state) {
-          is SafetyMachine.State.Watching -> s.playing
-          else -> false
-        }
+    val playing = machinePlaying()
     if (!playing) rewindIfEnded()
     apply(machine.on(if (playing) Event.UserPause else Event.UserPlay))
   }
@@ -407,7 +427,7 @@ class PlayerHub(
                   // Unloaded by a drive: reload where it stopped, now that the picture may show.
                   if (_youtube.value == null) {
                     _youtube.value =
-                        YouTubeRequest(d.youtubeVideoId, d.playlistId, (ytPositionMs / 1000).toInt(), true, settings.current.captions, ++nonce)
+                        YouTubeRequest(d.youtubeVideoId, d.playlistId, (ytPositionMs / 1000).toInt(), true, settings.current.captions, ++nonce, ytPlaylistIndex)
                   } else {
                     youtubeHandle?.play()
                   }
@@ -514,7 +534,9 @@ class PlayerHub(
     if (duration != null) library.saveProgress(np.video.id, duration, duration)
     reportServerStopped()
     apply(machine.on(Event.Ended))
-    if (settings.current.autoplayNext && np.hasNext) launchStart(np.queue[np.index + 1], np.queue, np.index + 1, convert = false, startAtMs = null)
+    if (settings.current.autoplayNext && np.hasNext) {
+      launchStart(np.queue[np.index + 1], np.queue, np.index + 1, convert = false, startAtMs = null, automatic = true)
+    }
   }
 
   // ---- YouTube embed bridge (main thread) ----
@@ -525,6 +547,22 @@ class PlayerHub(
 
   fun detachYouTube(handle: YouTubeHandle) {
     if (youtubeHandle === handle) youtubeHandle = null
+  }
+
+  fun isAttachedYouTube(handle: YouTubeHandle): Boolean = youtubeHandle === handle
+
+  /** A layout change recreates the embed: load the current position and intent, not the first load. */
+  fun requestForMount(request: YouTubeRequest): YouTubeRequest? {
+    val current = _youtube.value ?: return null
+    if (current.nonce != request.nonce || current.videoId != request.videoId || current.playlistId != request.playlistId) return null
+    // Never load a player from a stale composition after the picture has become restricted.
+    if (machine.state !is SafetyMachine.State.Watching || _now.value?.descriptor !is PlaybackDescriptor.YouTube) return null
+    return current.copy(
+        startSeconds = (ytPositionMs.coerceAtLeast(0) / 1000).toInt(),
+        autoplay = machinePlaying(),
+        captions = settings.current.captions,
+        playlistIndex = ytPlaylistIndex,
+    )
   }
 
   /** YouTube player states: -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued. */
@@ -542,10 +580,11 @@ class PlayerHub(
     }
   }
 
-  fun onYouTubeProgress(currentSeconds: Double, durationSeconds: Double) {
-    if (_now.value?.descriptor !is PlaybackDescriptor.YouTube) return
+  fun onYouTubeProgress(currentSeconds: Double, durationSeconds: Double, playlistIndex: Int = 0) {
+    val descriptor = _now.value?.descriptor as? PlaybackDescriptor.YouTube ?: return
     ytPositionMs = (currentSeconds * 1000).toLong()
     if (durationSeconds > 0) ytDurationMs = (durationSeconds * 1000).toLong()
+    ytPlaylistIndex = if (descriptor.playlistId != null) playlistIndex.coerceAtLeast(0) else 0
     _ui.update { it.copy(positionMs = ytPositionMs, durationMs = ytDurationMs) }
   }
 

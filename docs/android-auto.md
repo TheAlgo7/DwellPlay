@@ -2,6 +2,8 @@
 
 Checked against Google's documentation and on Android Auto itself on 30 September 2026.
 
+The 1 October Dark Cinema refinement retains the same projected-activity route, density correction and host corner reservations. Its current checks use emulators and simulated displays; the historical phone/DHU findings below have not yet been repeated on the redesigned build. The actual Curvv remains untested.
+
 ## The three routes
 
 ### 1. Android Auto today: the parked-app door (the `personal` build)
@@ -41,7 +43,7 @@ Video apps are a supported category there today ([Build video apps](https://deve
 
 ## What the head unit taught us
 
-Tested on the Desktop Head Unit 2.0 with the Curvv preset, a Galaxy S24 Ultra on Android 16, Android Auto 17.7, and a debug build installed over USB.
+Tested on **30 September 2026, before the Dark Cinema refinement**, on the Desktop Head Unit 2.0 with the Curvv preset, a Galaxy S24 Ultra on Android 16, Android Auto 17.7, and a debug build installed over USB.
 
 **It works.** Parked: DwellPlay opens full screen from the car's app grid and plays phone videos and YouTube. `restrict all` (driving): Android Auto removes it from the screen and returns to its dashboard. A phone video carries on as sound, and Android Auto's dashboard media card shows it with pause and previous. YouTube stops completely. `restrict none` (parked) and reopening: "Parked. Ready when you are." with Resume video, and it continues where it stopped. Typing works too: the phone's keyboard appears on the car screen.
 
@@ -81,6 +83,8 @@ To rebuild the bundle after a change: bump `versionCode` in `app/build.gradle`, 
 
 The bundle lands in `app\build\outputs\bundle\personalRelease\`.
 
+Use a freshly built, verified bundle after source changes; do not assume the archived 0.1.0 asset contains the latest refinement.
+
 ## Testing with the Desktop Head Unit
 
 The DHU stands in for the car. It needs a real phone.
@@ -105,7 +109,9 @@ The DHU stands in for the car. It needs a real phone.
    quit
    ```
 
-   Check four things: DwellPlay appears in the app grid; a YouTube video stops dead when `restrict all` arrives; a phone video carries on as sound and shows in Android Auto's media card; after `restrict none`, reopening DwellPlay shows the Resume prompt and no moving picture.
+   Check four things: DwellPlay appears in the app grid; a YouTube video stops dead when `restrict all` arrives; a phone video carries on as sound and shows in Android Auto's media card; after `restrict none`, reopening DwellPlay shows the Resume prompt and no moving picture. Also exercise the refined navigation and player at the host scale, including its reserved corners, queue scrolling and full-screen transitions.
+
+For emulator-only layout checks, use a 1920x720 **262dpi app display**, as shown in [testing.md](testing.md). The 1.31 theme correction returns that to the actual DHU preset's 200dpi scale. Such an overlay does not test Android Auto's host behavior.
 
 After installing a build whose manifest changed, reconnect the DHU (`quit`, then start it again): Android Auto builds its app list when the head unit connects.
 

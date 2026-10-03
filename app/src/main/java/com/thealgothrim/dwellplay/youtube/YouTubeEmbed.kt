@@ -40,8 +40,9 @@ fun YouTubeEmbed(request: PlayerHub.YouTubeRequest?, hub: PlayerHub, modifier: M
       player.destroy()
     }
   }
-  LaunchedEffect(request?.nonce, request == null) {
-    if (request == null) player.stop() else player.load(request)
+  LaunchedEffect(player, request?.nonce, request == null) {
+    val mountRequest = request?.let(hub::requestForMount)
+    if (mountRequest == null) player.stop() else player.load(mountRequest)
   }
   AndroidView(factory = { player.view }, modifier = modifier)
 }
@@ -49,6 +50,7 @@ fun YouTubeEmbed(request: PlayerHub.YouTubeRequest?, hub: PlayerHub, modifier: M
 @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 private class EmbedPlayer(private val context: Context, private val hub: PlayerHub) : PlayerHub.YouTubeHandle {
   private val main = Handler(Looper.getMainLooper())
+  private var destroyed = false
   private var pageReady = false
   private val queued = ArrayList<String>()
   private val origin = "https://${context.packageName}"
@@ -73,6 +75,7 @@ private class EmbedPlayer(private val context: Context, private val hub: PlayerH
         webViewClient =
             object : WebViewClient() {
               override fun onPageFinished(view: WebView, url: String?) {
+                if (destroyed) return
                 pageReady = true
                 queued.forEach { view.evaluateJavascript(it, null) }
                 queued.clear()
@@ -87,7 +90,7 @@ private class EmbedPlayer(private val context: Context, private val hub: PlayerH
 
               override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
                 Log.w(TAG, "WebView renderer gone (crashed=${detail.didCrash()})")
-                main.post { hub.onYouTubeError(5) }
+                reportToHub { hub.onYouTubeError(5) }
                 return true
               }
             }
@@ -97,7 +100,7 @@ private class EmbedPlayer(private val context: Context, private val hub: PlayerH
       }
 
   fun load(r: PlayerHub.YouTubeRequest) =
-      js("dwell.load(${str(r.videoId)}, ${str(r.playlistId)}, ${r.startSeconds}, ${r.autoplay}, ${r.captions})")
+      js("dwell.load(${str(r.videoId)}, ${str(r.playlistId)}, ${r.startSeconds}, ${r.autoplay}, ${r.captions}, ${r.playlistIndex})")
 
   override fun play() = js("dwell.play()")
 
@@ -114,6 +117,8 @@ private class EmbedPlayer(private val context: Context, private val hub: PlayerH
   override fun captions(on: Boolean) = js("dwell.captions($on)")
 
   fun destroy() {
+    destroyed = true
+    queued.clear()
     runCatching {
       view.evaluateJavascript("dwell.stop()", null)
       view.stopLoading()
@@ -124,7 +129,15 @@ private class EmbedPlayer(private val context: Context, private val hub: PlayerH
   }
 
   private fun js(code: String) {
+    if (destroyed) return
     if (pageReady) view.evaluateJavascript(code, null) else queued += code
+  }
+
+  private fun reportToHub(callback: () -> Unit) {
+    main.post {
+      // A disposed WebView can still deliver stop/pause/progress events after another is mounted.
+      if (!destroyed && hub.isAttachedYouTube(this)) callback()
+    }
   }
 
   private fun str(s: String?): String = if (s == null) "null" else "\"" + s.replace("\\", "").replace("\"", "") + "\""
@@ -135,11 +148,12 @@ private class EmbedPlayer(private val context: Context, private val hub: PlayerH
 
     @JavascriptInterface fun onReady() = Unit
 
-    @JavascriptInterface fun onState(state: Int) = main.post { hub.onYouTubeState(state) }.let {}
+    @JavascriptInterface fun onState(state: Int) = reportToHub { hub.onYouTubeState(state) }
 
-    @JavascriptInterface fun onProgress(current: Double, duration: Double, videoId: String) = main.post { hub.onYouTubeProgress(current, duration) }.let {}
+    @JavascriptInterface fun onProgress(current: Double, duration: Double, videoId: String, playlistIndex: Int) =
+        reportToHub { hub.onYouTubeProgress(current, duration, playlistIndex) }
 
-    @JavascriptInterface fun onError(code: Int) = main.post { hub.onYouTubeError(code) }.let {}
+    @JavascriptInterface fun onError(code: Int) = reportToHub { hub.onYouTubeError(code) }
   }
 
   companion object {

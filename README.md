@@ -4,9 +4,21 @@ Your parked-screen media hub: videos on your phone, YouTube, your own Jellyfin s
 
 One Android app for three screens: the phone, the car screen through Android Auto, and cars that run Android Automotive OS (Google built-in).
 
+## Dark Cinema
+
+The 1 October 2026 refinement uses near-black graphite layers, restrained dark translucent controls, neutral transport buttons and small Algothrim crimson accents. Artwork remains the card; cached artwork adds a quiet atmosphere around the player controls. The direction is recorded in [DESIGN.md](DESIGN.md).
+
+Home, Library, Search and Sources are the four primary destinations. Settings is in the phone Home header and the car rail footer; compact car windows also expose it in Home. Navigation becomes an inset dock when a rail would leave too little room.
+
+The player recomposes for the window: panoramic video and controls sit side by side, while phone portrait and narrower car windows stack them. The active video stage stays visible while metadata and the expandable queue scroll. YouTube's controls remain outside its official player; layout changes preserve its current position and play/pause intent.
+
+## Screenshots and verification
+
+The screenshots below are historical captures from 30 September 2026, before the Dark Cinema refinement. The Android Auto images came from a real phone connected to the Desktop Head Unit, not the actual Curvv. Checks for the redesigned build use emulators and simulated displays; see [docs/testing.md](docs/testing.md) for the verification steps and results. The redesign still needs a fresh phone/DHU test, and the actual Curvv remains unproven.
+
 ![DwellPlay on Android Auto: YouTube's own player at full height, DwellPlay's controls in a rail beside it](docs/readme/android-auto-youtube.png)
 
-Above: Android Auto itself (the Desktop Head Unit set to a Tata Curvv's 1920x720 screen, driven by a real phone). Below: after a drive, the picture waits for a tap. The back arrow and Exit button in the corners are Android Auto's own.
+Above: Android Auto on 30 September 2026 (the Desktop Head Unit set to a Tata Curvv's 1920x720 screen, driven by a real phone). Below: after a drive, the picture waits for a tap. The back arrow and Exit button in the corners are Android Auto's own.
 
 ![DwellPlay on Android Auto after a drive: "Parked. Ready when you are." with a Resume video button](docs/readme/android-auto-resume.png)
 
@@ -44,14 +56,15 @@ These are the product, not an add-on. They live in one small state machine ([cor
 - When the car moves, YouTube stops completely. Its rules forbid audio-only or background play, and the code makes that impossible by type, not by convention.
 - Your own videos (phone, folder, Jellyfin, links) can carry on as sound while you drive, if you leave that setting on and the car allows it.
 - After a drive the picture never restarts by itself. You tap "Resume video".
+- Automatic queue advancement and play from external media controls retain that Resume requirement. Eligible native sound can continue; YouTube stays stopped until a deliberate video action.
 
 ## How it reaches a car
 
 | Screen | Build | Status |
 |---|---|---|
-| Android Auto (for example a Tata Curvv) | `personal` | Android Auto already runs parked apps on the car screen from Android 15. Today it opens that door only to games, so this build declares itself as one. Works on the Desktop Head Unit with a real phone (Android 16, Android Auto 17.7): parked, it plays; driving, Android Auto takes the screen and only your own videos carry on as sound. For personal use through Play's internal testing track only. |
+| Android Auto (for example a Tata Curvv) | `personal` | Uses the parked-game route documented on 30 September 2026. The pre-refinement build worked on the Desktop Head Unit with a real phone (Android 16, Android Auto 17.7): parked video, native sound while driving, and explicit Resume after parking. The redesigned build needs a new DHU test; the actual Curvv has not been tested. For personal use through Play's internal testing track only. |
 | Android Auto, officially | `store` | Google announced video apps for Android Auto in May 2026 (Tata is on the launch list, phones need Android 17). When it opens, the `store` build's honest `video` declaration is what ships. |
-| Android Automotive OS | `store` | Supported by Google for video apps today. Works on the Android 15 car emulator with real driving restrictions. |
+| Android Automotive OS | `store` | The pre-refinement build was checked on the Android 15 car emulator with platform driving restrictions on 30 September 2026. Re-check the redesigned build using the steps in testing.md. |
 
 Details and the step-by-step for a real car are in [docs/android-auto.md](docs/android-auto.md).
 
@@ -72,6 +85,8 @@ bash tools/demo-data.sh emulator-5554
 ```
 
 Debug builds install next to the real app as "DwellPlay debug" and accept test commands over adb (pretend the car is driving, add a link, play something). See [docs/testing.md](docs/testing.md).
+
+The core suite now contains 45 test cases, including post-drive queue advancement and external-play regressions. Run it for the current result; an emulator layout check does not establish real-car compatibility.
 
 ## Layout
 

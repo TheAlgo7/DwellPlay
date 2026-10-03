@@ -1,6 +1,7 @@
 package com.thealgothrim.dwellplay.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -36,7 +37,7 @@ import com.thealgothrim.dwellplay.ui.theme.Palette
 import com.thealgothrim.dwellplay.ui.theme.isCar
 
 @Composable
-fun HomeScreen(screen: Screen, nav: AppNav, actions: AppActions) {
+fun HomeScreen(screen: Screen, nav: AppNav, actions: AppActions, railNavigation: Boolean = false) {
   val library = AppGraph.library
   val dims = LocalDims.current
   val phone by library.phone.collectAsState()
@@ -54,8 +55,8 @@ fun HomeScreen(screen: Screen, nav: AppNav, actions: AppActions) {
   val links = saved.filter { it.type == SourceType.STREAM }
   val nothingYet = phone.isEmpty() && saved.isEmpty() && sources.isEmpty() && continueWatching.isEmpty()
 
-  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = dims.gap, bottom = dims.section * 2), verticalArrangement = Arrangement.spacedBy(dims.section)) {
-    item { HomeHeader(screen) }
+  LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = dims.gap, bottom = dims.section * 2), verticalArrangement = Arrangement.spacedBy(dims.section + if (screen.isCar) 0.dp else 8.dp)) {
+    item { HomeHeader(screen, showSettings = !screen.isCar || !railNavigation, onSettings = { actions.goTo(Tab.SETTINGS) }) }
     if (nothingYet) item { Welcome(access != PhoneVideos.Access.NONE, actions) }
     // Rows only exist when they have something in them, so empty ones leave no gaps.
     if (continueWatching.isNotEmpty()) item { CardRow("Continue watching", continueWatching, progressOf, actions.open, manage) }
@@ -104,19 +105,45 @@ fun HomeScreen(screen: Screen, nav: AppNav, actions: AppActions) {
 }
 
 @Composable
-private fun HomeHeader(screen: Screen) {
+private fun HomeHeader(screen: Screen, showSettings: Boolean, onSettings: () -> Unit) {
   val dims = LocalDims.current
   val type = LocalType.current
-  Row(Modifier.fillMaxWidth().padding(horizontal = dims.gutter), verticalAlignment = Alignment.CenterVertically) {
-    Wordmark(Modifier.weight(1f))
-    if (screen.isCar) {
-      // The state in words and an icon, never colour alone.
-      Icon(Icons.Parked, null, tint = Palette.Accent, modifier = Modifier.size(dims.icon))
-      Spacer(Modifier.width(8.dp))
-      Text("Parked, video on", style = type.body)
-      // Leave Android Auto's Exit button its corner.
-      Spacer(Modifier.width(LocalHostCorners.current.end))
+  BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = dims.gutter)) {
+    val statusInRow = screen.isCar && maxWidth >= 720.dp
+    Column {
+      Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+          Wordmark()
+          if (!screen.isCar) {
+            Spacer(Modifier.height(4.dp))
+            Text("Your media, together.", style = type.meta)
+          }
+        }
+        if (statusInRow) ParkedStatus()
+        if (showSettings) {
+          Spacer(Modifier.width(dims.gap / 2))
+          IconAction(Icons.Settings, "Settings", onClick = onSettings, modifier = Modifier.chrome(dims.touch / 2), tint = Palette.Text2)
+        }
+        // Android Auto's Exit button owns the top-right corner.
+        if (statusInRow) Spacer(Modifier.width(LocalHostCorners.current.end))
+      }
+      if (screen.isCar && !statusInRow) {
+        Spacer(Modifier.height(dims.gap / 2))
+        ParkedStatus()
+      }
     }
+  }
+}
+
+@Composable
+private fun ParkedStatus() {
+  val dims = LocalDims.current
+  val type = LocalType.current
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    // The state is always expressed in words and an icon, rather than color alone.
+    Icon(Icons.Parked, null, tint = Palette.Text2, modifier = Modifier.size(dims.icon))
+    Spacer(Modifier.width(8.dp))
+    Text("Parked, video on", style = type.body)
   }
 }
 

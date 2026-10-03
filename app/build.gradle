@@ -18,8 +18,8 @@ android {
         // Android Auto runs parked apps on the car screen from Android 15; the phone app itself works from 10.
         minSdk 29
         targetSdk 36
-        versionCode 1
-        versionName "0.1.0"
+        versionCode 2
+        versionName "0.1.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         // Search needs a YouTube Data API key (free, 100 searches a day). Shared links work without one.

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -17,12 +19,14 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -48,6 +52,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -63,6 +68,7 @@ import com.thealgothrim.dwellplay.data.PictureFit
 import com.thealgothrim.dwellplay.playback.PlayerHub
 import com.thealgothrim.dwellplay.ui.theme.LocalDims
 import com.thealgothrim.dwellplay.ui.theme.LocalHostCorners
+import com.thealgothrim.dwellplay.ui.theme.LocalScreen
 import com.thealgothrim.dwellplay.ui.theme.LocalType
 import com.thealgothrim.dwellplay.ui.theme.Palette
 import com.thealgothrim.dwellplay.ui.theme.isCar
@@ -82,22 +88,25 @@ fun PlayerScreen(screen: Screen, wide: Boolean, onClose: () -> Unit, actions: Ap
   val np = now ?: return
   var theater by rememberSaveable { mutableStateOf(false) }
 
-  BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
+  BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Canvas)) {
     val landscape = maxWidth > maxHeight
-    // The rail needs room: a car screen or a tablet. A phone on its side goes straight to full screen.
-    val roomy = screen.isCar || (wide && maxWidth >= 840.dp && maxHeight >= 480.dp)
+    // Recompose for the window, not the platform: a narrow car cannot fit a useful control rail.
+    val minRail = if (screen.isCar) 448.dp else 320.dp
+    val panoramic = (screen.isCar || wide) && maxWidth >= minRail + 640.dp &&
+        maxWidth >= maxHeight * 2.1f && maxHeight >= 320.dp
+    val stackedMinHeight = LocalHostCorners.current.height + LocalDims.current.touch * 2 + 200.dp
     when {
-      roomy && !theater -> {
-        val minRail = if (screen.isCar) 420.dp else 320.dp
-        val rail = (maxWidth - maxHeight * 16f / 9f).coerceIn(minRail, maxWidth * 0.45f)
+      maxHeight < stackedMinHeight -> FullScreen(np, onClose, actions, onExit = null)
+      theater -> FullScreen(np, onClose, actions, onExit = { theater = false })
+      panoramic -> {
+        val rail = (maxWidth * 0.30f).coerceIn(minRail, maxWidth * 0.38f)
         Row(Modifier.fillMaxSize()) {
           Stage(np, Modifier.weight(1f).fillMaxHeight(), onClose, actions, overlay = false)
           Rail(np, Modifier.width(rail).fillMaxHeight(), onClose, onTheater = { theater = true })
         }
       }
-      roomy || landscape ->
-          FullScreen(np, onClose, actions, onExit = if (roomy) ({ theater = false }) else null)
-      else -> PhonePortrait(np, onClose, actions)
+      landscape && !screen.isCar -> FullScreen(np, onClose, actions, onExit = null)
+      else -> StackedPlayer(np, onClose, actions, onTheater = { theater = true })
     }
   }
 }
@@ -108,19 +117,24 @@ private fun FullScreen(np: PlayerHub.NowPlaying, onClose: () -> Unit, actions: A
   val dims = LocalDims.current
   val hub = AppGraph.hub
   val ui by hub.ui.collectAsState()
+  val safety by hub.safety.collectAsState()
+  val transportEnabled = safety !is SafetyMachine.State.Hidden && !(np.isYouTube && safety is SafetyMachine.State.ResumePrompt)
   if (np.isYouTube) {
     Row(Modifier.fillMaxSize()) {
       Stage(np, Modifier.weight(1f).fillMaxHeight(), onClose, actions, overlay = false)
       Column(
           // Starts below Android Auto's Exit button, which sits in this corner.
-          Modifier.width(dims.touch + 16.dp).fillMaxHeight().background(Palette.Canvas).padding(top = 8.dp + LocalHostCorners.current.height, bottom = 8.dp),
+          // Only this bounded control column scrolls; the adjacent YouTube stage stays fixed.
+          Modifier.width(dims.touch + 16.dp).fillMaxHeight().background(Palette.CanvasRaised)
+              .padding(top = 8.dp + LocalHostCorners.current.height, bottom = 8.dp)
+              .verticalScroll(rememberScrollState()),
           horizontalAlignment = Alignment.CenterHorizontally,
-          verticalArrangement = Arrangement.SpaceBetween,
+          verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
         IconAction(Icons.Back, "Close player", onClick = onClose)
-        IconAction(if (ui.playing) Icons.Pause else Icons.Play, if (ui.playing) "Pause" else "Play", onClick = hub::togglePlay, filled = true)
-        IconAction(Icons.Next, "Next video", onClick = hub::next, enabled = np.hasNext || (np.descriptor as? PlaybackDescriptor.YouTube)?.playlistId != null)
-        if (onExit != null) IconAction(Icons.TheaterExit, "Leave full screen", onClick = onExit) else Spacer(Modifier.size(dims.touch))
+        IconAction(if (ui.playing) Icons.Pause else Icons.Play, if (ui.playing) "Pause" else "Play", onClick = hub::togglePlay, filled = true, enabled = transportEnabled)
+        IconAction(Icons.Next, "Next video", onClick = hub::next, enabled = transportEnabled && (np.hasNext || (np.descriptor as? PlaybackDescriptor.YouTube)?.playlistId != null))
+        if (onExit != null) IconAction(Icons.TheaterExit, "Leave full screen", onClick = onExit)
       }
     }
   } else {
@@ -129,42 +143,80 @@ private fun FullScreen(np: PlayerHub.NowPlaying, onClose: () -> Unit, actions: A
 }
 
 @Composable
-private fun PhonePortrait(np: PlayerHub.NowPlaying, onClose: () -> Unit, actions: AppActions) {
+private fun StackedPlayer(np: PlayerHub.NowPlaying, onClose: () -> Unit, actions: AppActions, onTheater: () -> Unit) {
   val dims = LocalDims.current
   val type = LocalType.current
+  val corners = LocalHostCorners.current
   Column(Modifier.fillMaxSize().background(Palette.Canvas)) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = dims.gutter / 2, end = dims.gutter, top = corners.height),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
       IconAction(Icons.Back, "Close player", onClick = onClose)
-      Text("Now playing", style = type.title)
+      Text("Now playing", style = type.meta, modifier = Modifier.weight(1f))
+      IconAction(Icons.Theater, "Full screen", onClick = onTheater, tint = Palette.Text2)
     }
-    Stage(np, Modifier.fillMaxWidth().aspectRatio(16f / 9f), onClose, actions, overlay = false)
-    Column(Modifier.fillMaxSize().padding(horizontal = dims.gutter)) {
-      Spacer(Modifier.height(dims.gap))
-      Details(np)
-      Spacer(Modifier.height(dims.gap / 2))
-      Progress()
-      Controls(np)
-      SecondaryControls(np, onTheater = null)
-      UpNext(np, Modifier.weight(1f))
+    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+      // Keep the active picture visible when controls or a long queue scroll. On short car
+      // windows the stage is letterboxed instead of consuming the whole control viewport.
+      val naturalHeight = maxWidth * 9f / 16f
+      val minimumHeight = if (np.isYouTube) 200.dp else 0.dp
+      val stageHeight = minOf(maxOf(naturalHeight, minimumHeight), maxOf(maxHeight * 0.5f, minimumHeight))
+      val transportFirst = LocalScreen.current.isCar && maxWidth > maxHeight
+      Column(Modifier.fillMaxSize()) {
+        Stage(np, Modifier.fillMaxWidth().height(stageHeight), onClose, actions, overlay = false)
+        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+          MediaAtmosphere(
+              np.video,
+              Modifier.fillMaxWidth().padding(horizontal = dims.gutter, vertical = dims.gap).chrome(28.dp),
+          ) {
+            Column(Modifier.fillMaxWidth().padding(dims.gap)) {
+              if (transportFirst) {
+                Controls(np)
+                Spacer(Modifier.height(dims.gap))
+              }
+              Details(np)
+              Spacer(Modifier.height(dims.gap))
+              Progress()
+              if (!transportFirst) Controls(np)
+              Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                SecondaryControls(np, onTheater = null)
+              }
+              Spacer(Modifier.height(dims.gap))
+              ExpandableQueue(np)
+            }
+          }
+          Spacer(Modifier.height(dims.gap))
+        }
+      }
     }
   }
 }
 
-/** The side rail on wide screens: what's playing, the controls, what's next. */
+/** An inset control surface beside the picture. Artwork atmosphere never covers the live player. */
 @Composable
 private fun Rail(np: PlayerHub.NowPlaying, modifier: Modifier, onClose: () -> Unit, onTheater: () -> Unit) {
   val dims = LocalDims.current
-  Column(modifier.background(Palette.Canvas).padding(horizontal = dims.gap / 2, vertical = 4.dp)) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      IconAction(Icons.Back, "Close player", onClick = onClose)
-      // On Android Auto its Exit button owns the top-right corner, so these sit next to Back.
-      if (LocalHostCorners.current.end == 0.dp) Spacer(Modifier.weight(1f))
-      SecondaryControls(np, onTheater)
+  val corners = LocalHostCorners.current
+  MediaAtmosphere(np.video, modifier.padding(start = 8.dp, end = 16.dp, top = 16.dp, bottom = 16.dp).chrome(28.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = dims.gap / 2, vertical = 8.dp)) {
+      // Keep the host-safe header fixed: queue scrolling must never move actions into Exit's corner.
+      Spacer(Modifier.height(corners.height))
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        IconAction(Icons.Back, "Close player", onClick = onClose)
+        Spacer(Modifier.weight(1f))
+        SecondaryControls(np, onTheater)
+      }
+      Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {
+        Spacer(Modifier.height(dims.gap / 2))
+        Details(np, Modifier.padding(horizontal = 8.dp))
+        Spacer(Modifier.height(dims.gap / 2))
+        Progress(Modifier.padding(horizontal = 8.dp))
+        Controls(np)
+        Spacer(Modifier.height(dims.gap / 2))
+        ExpandableQueue(np, Modifier.padding(horizontal = 8.dp))
+      }
     }
-    Details(np, Modifier.padding(horizontal = 8.dp))
-    Progress(Modifier.padding(horizontal = 8.dp))
-    Controls(np)
-    UpNext(np, Modifier.weight(1f))
   }
 }
 
@@ -173,7 +225,13 @@ private fun Details(np: PlayerHub.NowPlaying, modifier: Modifier = Modifier) {
   val dims = LocalDims.current
   val type = LocalType.current
   Column(modifier) {
-    Text(np.video.title, style = type.title, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    Text(
+        np.video.title,
+        style = if (LocalScreen.current.isCar) type.title else type.heading.copy(fontSize = 24.sp, fontWeight = FontWeight.SemiBold),
+        maxLines = 3,
+        overflow = TextOverflow.Ellipsis,
+    )
+    Spacer(Modifier.height(6.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       Icon(np.video.type.icon(), null, tint = Palette.Text3, modifier = Modifier.size(dims.iconSmall).padding(end = 4.dp))
       Text(listOfNotNull(np.video.subtitle, np.video.type.label()).distinct().joinToString(" · "), style = type.meta, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -187,6 +245,9 @@ private fun Progress(modifier: Modifier = Modifier) {
   val type = LocalType.current
   val dims = LocalDims.current
   val ui by hub.ui.collectAsState()
+  val safety by hub.safety.collectAsState()
+  val now by hub.now.collectAsState()
+  val seekEnabled = safety !is SafetyMachine.State.Hidden && !(now?.isYouTube == true && safety is SafetyMachine.State.ResumePrompt)
   var dragging by remember { mutableStateOf<Float?>(null) }
   val duration = ui.durationMs
   Column(modifier.fillMaxWidth()) {
@@ -194,12 +255,13 @@ private fun Progress(modifier: Modifier = Modifier) {
       val fraction = dragging ?: (ui.positionMs.toFloat() / duration).coerceIn(0f, 1f)
       Slider(
           value = fraction,
+          enabled = seekEnabled,
           onValueChange = { dragging = it },
           onValueChangeFinished = {
             dragging?.let { hub.seekTo((it * duration).toLong()) }
             dragging = null
           },
-          modifier = Modifier.fillMaxWidth().height(dims.touch * 0.7f).semantics { contentDescription = "Position" },
+          modifier = Modifier.fillMaxWidth().height(dims.touch).semantics { contentDescription = "Position" },
           colors = SliderDefaults.colors(thumbColor = Palette.Accent, activeTrackColor = Palette.Accent, inactiveTrackColor = Palette.SurfaceTop),
       )
       Row(Modifier.fillMaxWidth()) {
@@ -220,22 +282,42 @@ private fun Controls(np: PlayerHub.NowPlaying) {
   val ui by hub.ui.collectAsState()
   val safety by hub.safety.collectAsState()
   // While the picture is hidden for driving there's nothing to press here.
-  val live = safety !is SafetyMachine.State.Hidden
+  val live = safety !is SafetyMachine.State.Hidden && !(np.isYouTube && safety is SafetyMachine.State.ResumePrompt)
   val playlist = (np.descriptor as? PlaybackDescriptor.YouTube)?.playlistId != null
-  Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).alpha(if (live) 1f else 0.4f), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-    IconAction(Icons.Previous, "Previous video", onClick = hub::previous, enabled = live)
-    SeekButton(back = true, enabled = live)
-    IconAction(
-        if (ui.playing) Icons.Pause else Icons.Play,
-        if (ui.playing) "Pause" else "Play",
-        onClick = hub::togglePlay,
-        size = dims.play,
-        iconSize = dims.iconLarge,
-        filled = true,
-        enabled = live,
-    )
-    SeekButton(back = false, enabled = live)
-    IconAction(Icons.Next, "Next video", onClick = hub::next, enabled = live && (np.hasNext || playlist))
+  val playPause: @Composable () -> Unit = {
+      IconAction(
+          if (ui.playing) Icons.Pause else Icons.Play,
+          if (ui.playing) "Pause" else "Play",
+          onClick = hub::togglePlay,
+          size = dims.play,
+          iconSize = dims.iconLarge,
+          filled = true,
+          enabled = live,
+      )
+  }
+  BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = 4.dp).alpha(if (live) 1f else 0.4f)) {
+    if (maxWidth < dims.touch * 4 + dims.play) {
+      Column {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+          IconAction(Icons.Previous, "Previous video", onClick = hub::previous, enabled = live)
+          playPause()
+          IconAction(Icons.Next, "Next video", onClick = hub::next, enabled = live && (np.hasNext || playlist))
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+          SeekButton(back = true, enabled = live)
+          Spacer(Modifier.width(dims.gap))
+          SeekButton(back = false, enabled = live)
+        }
+      }
+    } else {
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+        IconAction(Icons.Previous, "Previous video", onClick = hub::previous, enabled = live)
+        SeekButton(back = true, enabled = live)
+        playPause()
+        SeekButton(back = false, enabled = live)
+        IconAction(Icons.Next, "Next video", onClick = hub::next, enabled = live && (np.hasNext || playlist))
+      }
+    }
   }
 }
 
@@ -278,28 +360,59 @@ private fun SecondaryControls(np: PlayerHub.NowPlaying, onTheater: (() -> Unit)?
 }
 
 @Composable
-private fun UpNext(np: PlayerHub.NowPlaying, modifier: Modifier) {
+private fun ExpandableQueue(np: PlayerHub.NowPlaying, modifier: Modifier = Modifier) {
   val hub = AppGraph.hub
   val dims = LocalDims.current
   val type = LocalType.current
   val upcoming = np.queue.drop(np.index + 1)
+  val playlist = (np.descriptor as? PlaybackDescriptor.YouTube)?.playlistId != null
+  var expanded by rememberSaveable { mutableStateOf(false) }
   Column(modifier.fillMaxWidth()) {
-    if (upcoming.isEmpty()) {
-      if ((np.descriptor as? PlaybackDescriptor.YouTube)?.playlistId != null) Text("Playing a YouTube playlist", style = type.meta, modifier = Modifier.padding(8.dp))
-      return@Column
+    Box(Modifier.fillMaxWidth().height(1.dp).background(Palette.Hairline))
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = dims.touch)
+            .clickable(role = Role.Button) { expanded = !expanded }
+            .semantics { contentDescription = if (expanded) "Hide queue" else "Show queue, ${upcoming.size} videos up next" }
+            .padding(dims.gap / 2),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Icon(Icons.Queue, null, tint = Palette.Text2, modifier = Modifier.size(dims.icon))
+      Spacer(Modifier.width(dims.gap / 2))
+      Column(Modifier.weight(1f)) {
+        Text("Up next", style = type.title)
+        Text(
+            upcoming.firstOrNull()?.title ?: if (playlist) "YouTube playlist" else "Nothing queued yet",
+            style = type.meta,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+      }
+      Spacer(Modifier.width(8.dp))
+      Text(if (expanded) "Hide" else "View", style = type.button.copy(color = Palette.Text2))
     }
-    Text("Up next", style = type.title, modifier = Modifier.padding(start = 8.dp, top = 8.dp, bottom = 4.dp))
-    LazyColumn {
-      itemsIndexed(upcoming.take(30), key = { _, v -> v.id }) { i, v ->
-        Row(
-            Modifier.fillMaxWidth().clip(RoundedCornerShape(dims.corner)).clickable { hub.play(v, np.queue) }.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-          Artwork(v, Modifier.height(dims.touch * 0.8f).aspectRatio(16f / 9f))
-          Spacer(Modifier.width(12.dp))
-          Column(Modifier.weight(1f)) {
-            Text(v.title, style = type.body, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            v.durationMs?.let { Text(formatClock(it), style = type.meta) }
+    AnimatedVisibility(expanded, enter = fadeIn(), exit = fadeOut()) {
+      Column(Modifier.fillMaxWidth().padding(bottom = dims.gap / 2)) {
+        if (upcoming.isEmpty()) {
+          Text(
+              if (playlist) "YouTube continues with the next video in this playlist." else "Choose another video from your library to keep watching.",
+              style = type.body.copy(color = Palette.Text2),
+              modifier = Modifier.padding(dims.gap),
+          )
+        }
+        upcoming.take(30).forEach { v ->
+          Row(
+              Modifier.fillMaxWidth().heightIn(min = dims.touch)
+                  .clip(RoundedCornerShape(dims.corner))
+                  .clickable(role = Role.Button) { hub.play(v, np.queue) }
+                  .padding(dims.gap / 2),
+              verticalAlignment = Alignment.CenterVertically,
+          ) {
+            Artwork(v, Modifier.width(if (LocalScreen.current.isCar) 104.dp else 88.dp).aspectRatio(16f / 9f))
+            Spacer(Modifier.width(dims.gap / 2))
+            Column(Modifier.weight(1f)) {
+              Text(v.title, style = type.body, maxLines = 2, overflow = TextOverflow.Ellipsis)
+              v.durationMs?.let { Text(formatClock(it), style = type.meta) }
+            }
           }
         }
       }
@@ -373,13 +486,16 @@ private fun Stage(
 private fun OverlayControls(np: PlayerHub.NowPlaying, onClose: () -> Unit, onExitTheater: (() -> Unit)?) {
   val dims = LocalDims.current
   val type = LocalType.current
+  val corners = LocalHostCorners.current
   Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color(0xCC000000), 0.3f to Color.Transparent, 0.65f to Color.Transparent, 1f to Color(0xE6000000)))) {
     // Shifted right on Android Auto, whose own back arrow sits in the top-left corner.
-    Row(Modifier.align(Alignment.TopStart).padding(8.dp).padding(start = LocalHostCorners.current.start), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(8.dp).padding(start = corners.start, end = corners.end), verticalAlignment = Alignment.CenterVertically) {
       IconAction(Icons.Back, "Close player", onClick = onClose)
-      Text(np.video.title, style = type.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text(np.video.title, style = type.title, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
     }
-    Box(Modifier.align(Alignment.Center)) { Controls(np) }
+    Box(Modifier.align(Alignment.Center).padding(horizontal = dims.gutter).widthIn(max = 720.dp).fillMaxWidth().chrome(dims.play).padding(horizontal = dims.gap / 2, vertical = 4.dp)) {
+      Controls(np)
+    }
     Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = dims.gutter, vertical = 8.dp)) {
       Progress()
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -400,25 +516,38 @@ private fun Poster(np: PlayerHub.NowPlaying, content: @Composable () -> Unit) {
 }
 
 /** Back from a drive: the picture waits for a tap. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ResumePanel(np: PlayerHub.NowPlaying, audioPlaying: Boolean, onClose: () -> Unit) {
   val hub = AppGraph.hub
   val ui by hub.ui.collectAsState()
   val dims = LocalDims.current
   val type = LocalType.current
-  Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-    Artwork(np.video, Modifier.fillMaxSize().alpha(0.25f))
-    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(dims.gutter)) {
-      Icon(Icons.Parked, null, tint = Palette.Accent, modifier = Modifier.size(dims.iconLarge))
-      Spacer(Modifier.height(dims.gap / 2))
-      Text("Parked. Ready when you are.", style = type.heading)
-      Spacer(Modifier.height(6.dp))
+  BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Artwork(np.video, Modifier.fillMaxSize().alpha(0.22f))
+    Box(Modifier.fillMaxSize().background(Palette.Canvas.copy(alpha = 0.25f)))
+    // The bounded card can scroll rather than losing its Resume action on a short display.
+    val inset = if (LocalScreen.current.isCar) 16.dp else 8.dp
+    val safeTop = LocalHostCorners.current.height
+    val cardHeight = maxHeight - safeTop - inset * 2
+    Column(
+        Modifier.padding(start = inset, end = inset, top = safeTop + inset, bottom = inset)
+            .widthIn(max = 640.dp).heightIn(max = if (cardHeight < 1.dp) 1.dp else cardHeight)
+            .chrome(24.dp).verticalScroll(rememberScrollState()).padding(dims.gap),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(dims.gap / 2)) {
+        Icon(Icons.Parked, null, tint = Palette.Text, modifier = Modifier.size(dims.icon))
+        Text("Parked. Ready when you are.", style = type.heading, textAlign = TextAlign.Center)
+      }
+      Spacer(Modifier.height(8.dp))
       Text(
-          if (audioPlaying) "The sound kept playing while you drove." else "Paused at ${formatClock(ui.positionMs)} while you drove.",
+          if (audioPlaying) "Sound is playing · ${formatClock(ui.positionMs)}" else "Paused at ${formatClock(ui.positionMs)}",
           style = type.body.copy(color = Palette.Text2),
+          textAlign = TextAlign.Center,
       )
       Spacer(Modifier.height(dims.gap))
-      Row(horizontalArrangement = Arrangement.spacedBy(dims.gap / 2)) {
+      FlowRow(horizontalArrangement = Arrangement.spacedBy(dims.gap / 2, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(dims.gap / 2)) {
         ActionButton("Resume video", hub::resumeVideo, icon = Icons.Play, primary = true)
         ActionButton("Close", onClose)
       }
@@ -447,6 +576,7 @@ private fun HiddenPanel(np: PlayerHub.NowPlaying) {
 private fun ProblemPanel(p: PlayerHub.Problem, np: PlayerHub.NowPlaying, onClose: () -> Unit, actions: AppActions) {
   val hub = AppGraph.hub
   val context = LocalContext.current
+  val sources by AppGraph.library.sources.collectAsState()
   MessagePanel(Icons.Error, p.title, p.detail, iconTint = Palette.Warning) {
     if (p.canConvert) ActionButton("Ask the server to convert it", hub::askServerToConvert, primary = true)
     if (p.canRetry) ActionButton("Try again", hub::retry, icon = Icons.Refresh, primary = !p.canConvert)
@@ -455,7 +585,7 @@ private fun ProblemPanel(p: PlayerHub.Problem, np: PlayerHub.NowPlaying, onClose
       ActionButton("Open in YouTube", { openInYouTube(context, ref?.videoId, ref?.playlistId) }, icon = Icons.Open, primary = true)
     }
     if (p.signIn) {
-      val address = AppGraph.library.sources.value.firstOrNull { it.id == np.video.sourceId }?.server?.baseUrl
+      val address = sources.firstOrNull { it.id == np.video.sourceId }?.server?.baseUrl
       ActionButton("Sign in", { actions.dialog(AppDialog.Jellyfin(address)) }, primary = true)
     }
     ActionButton("Close", onClose)

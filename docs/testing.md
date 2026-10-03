@@ -6,11 +6,21 @@
 .\gradlew.bat :core:test
 ```
 
-35 tests in `core/src/test`:
+45 test cases in `core/src/test`:
 
-- `SafetyTest`: the car-safety contract. One test per rule: YouTube never becomes audio, nothing pressed while hidden brings the picture back, a drive always ends in the Resume prompt, and so on.
+- `SafetyTest`: the car-safety contract, including YouTube never becoming audio, hidden playback never restoring the picture, and a drive always ending in the Resume prompt. New regressions cover automatic next-title loading and external media play while Resume is pending: native audio is rechecked against the policy, and YouTube remains stopped.
 - `LinksTest`: every YouTube link shape the apps share, stream detection, subscription services refused, resume rules, search.
 - `ClientsTest`: the Jellyfin and YouTube clients against canned responses shaped like Jellyfin 12.1 and YouTube's APIs (sign-in, expired token fails closed, direct play, server conversion, search asks only for embeddable videos).
+
+## Dark Cinema verification (1 October 2026)
+
+The refinement is being checked with Android emulators and simulated displays. These checks do not repeat the real-phone/Desktop Head Unit session from 30 September, and the actual Curvv has never been tested. Historical results below belong to that earlier build; record final results for this revision separately.
+
+- Phone portrait and landscape: four destinations, Settings reachable from Home, native and YouTube players, expanded/empty queues, long titles and larger system fonts.
+- Panoramic, standard landscape and portrait car windows: useful video area, scrollable control surfaces, 76dp targets and 24sp labels. An unusually narrow dock scrolls instead of shrinking its targets.
+- Scroll the metadata or queue during YouTube playback: the official stage must stay visible. Change layout or enter/leave full screen while paused: current position, playlist index and paused intent must survive remounting.
+- Drive and park with native audio, including a title ending while Resume is pending: automatic next must leave the picture gated. An external play action may resume eligible sound, but must not restore the picture or start YouTube.
+- Open a dialog before driving: restrictions must remove its separate window. After parking, both the pending dialog and the Resume requirement remain recoverable.
 
 ## On an emulator
 
@@ -48,7 +58,7 @@ adb logcat -s DwellDebug
 An emulator can show a second display at the Curvv's panel size, and DwellPlay can be told to treat it as Android Auto's:
 
 ```bash
-adb shell settings put global overlay_display_devices "1920x720/200,should_show_system_decorations"
+adb shell settings put global overlay_display_devices "1920x720/262,should_show_system_decorations"
 adb shell cmd display get-displays                        # note the new display's id, for example 2
 adb shell am broadcast $R -a car --ez on true
 adb shell am start --display 2 -f 0x18000000 -n com.thealgothrim.dwellplay.debug/com.thealgothrim.dwellplay.MainActivity
@@ -57,6 +67,8 @@ adb shell dumpsys SurfaceFlinger --display-id             # the long id screenca
 bash tools/shot.sh car-home <long id>
 adb shell settings put global overlay_display_devices "''"   # remove it
 ```
+
+Use **262 dpi** for this simulated Android Auto app display: it matches the parked-app density measured on the DHU. `DwellTheme` divides it by 1.31, yielding the Curvv preset's 200dpi layout scale. A 200dpi overlay would apply that correction twice. The actual DHU preset remains 200 dpi. Additional shapes can use the same simulated 262dpi density; an ordinary phone or AAOS display does not use this correction.
 
 ## Android Automotive OS
 
@@ -90,7 +102,7 @@ adb -s emulator-5556 shell cmd car_service inject-vhal-event 0x11400400 4       
 adb -s emulator-5556 shell cmd car_service inject-vhal-event 0x11200402 true
 ```
 
-What should happen, and did on 30 September 2026:
+What should happen, and was observed on the pre-refinement build on 30 September 2026:
 
 1. Parked: the video plays in the theater and rail layout.
 2. Driving: the system covers DwellPlay. On this image it shows its Drive View with DwellPlay's title, position and pause button while the sound carries on; on images without audio-while-driving it shows "You can't use this feature while driving" and playback pauses.
@@ -102,11 +114,16 @@ The car emulator's network can be flaky (DNS drops). Use a local video for this 
 
 Needs a real phone. The Desktop Head Unit steps are in [android-auto.md](android-auto.md).
 
+The earlier phone/DHU test is historical evidence of the projection route. Repeat it after the refinement; emulator overlays cannot verify Android Auto's app grid, host corner buttons, keyboard or driving takeover.
+
 ## Before a release
 
 - `.\gradlew.bat :core:test` passes.
 - The release build still plays a phone video and a YouTube video (the release is shrunk with R8; `app/proguard-rules.pro` keeps the YouTube bridge).
 - On the car emulator: no path from driving to moving video, and YouTube stops completely.
+- Native auto-next and media play while waiting on Resume leave the picture gated; YouTube remains unloaded until an explicit video action.
+- YouTube remains visible when controls scroll; a layout remount preserves current position and pause state.
+- Four-destination navigation, Settings, queue and Resume actions remain usable on narrow windows and with larger fonts.
 - Controls are at least 76dp in the car layout; text is 24sp or larger.
 - A server sign-in that no longer works asks to sign in again and plays nothing.
 

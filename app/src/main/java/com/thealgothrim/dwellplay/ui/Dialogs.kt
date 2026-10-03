@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -132,7 +133,7 @@ private fun JellyfinSignIn(address: String?, onDismiss: () -> Unit) {
   error?.let { Text(it, style = type.body.copy(color = Palette.Error)) }
   Text(
       "Try Jellyfin's public demo server",
-      style = type.body.copy(color = Palette.Accent),
+      style = type.body.copy(color = Palette.Text),
       modifier =
           Modifier.clickable(role = Role.Button) {
                 server = "https://demo.jellyfin.org/stable"
@@ -168,7 +169,8 @@ private fun Manage(video: Video, onDismiss: () -> Unit, actions: AppActions) {
   val dims = LocalDims.current
   val context = LocalContext.current
   val library = AppGraph.library
-  val isSaved = library.saved.value.any { it.id == video.id }
+  val saved by library.saved.collectAsState()
+  val isSaved = saved.any { it.id == video.id }
   Row(verticalAlignment = Alignment.CenterVertically) {
     Artwork(video, Modifier.height(dims.touch * 1.4f).aspectRatio(16f / 9f))
     Spacer(Modifier.padding(start = dims.gap / 2))
@@ -234,7 +236,7 @@ fun DwellField(
           OutlinedTextFieldDefaults.colors(
               focusedBorderColor = Palette.Accent,
               unfocusedBorderColor = Palette.Hairline,
-              focusedLabelColor = Palette.Accent,
+              focusedLabelColor = Palette.Text,
               cursorColor = Palette.Accent,
           ),
   )
