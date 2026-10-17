@@ -31,6 +31,7 @@ import com.thealgothrim.dwellplay.BuildConfig
 import com.thealgothrim.dwellplay.car.CarScreens
 import com.thealgothrim.dwellplay.core.policy.Screen
 import com.thealgothrim.dwellplay.data.PictureFit
+import com.thealgothrim.dwellplay.data.SkipChoices
 import com.thealgothrim.dwellplay.ui.theme.LocalDims
 import com.thealgothrim.dwellplay.ui.theme.LocalType
 import com.thealgothrim.dwellplay.ui.theme.Palette
@@ -43,6 +44,7 @@ fun SettingsScreen(screen: Screen) {
   val type = LocalType.current
   val context = LocalContext.current
   var keyDraft by remember { mutableStateOf(prefs.youtubeKey) }
+  var tmdbDraft by remember { mutableStateOf(prefs.tmdbKey) }
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = gutterStart(), end = dims.gutter, top = dims.gutter, bottom = dims.gutter + LocalChromeInsets.current.bottom), verticalArrangement = Arrangement.spacedBy(dims.gap / 2)) {
     item { Text("Settings", style = type.hero) }
@@ -70,6 +72,20 @@ fun SettingsScreen(screen: Screen) {
       }
     }
 
+    item {
+      Row(Modifier.fillMaxWidth().defaultMinSize(minHeight = dims.touch), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+          Text("Skip length", style = type.title)
+          Text("For the skip buttons and for double-tapping the left or right of the picture.", style = type.meta)
+        }
+        Spacer(Modifier.width(dims.gap / 2))
+        SkipChoices.forEachIndexed { i, sec ->
+          if (i > 0) Spacer(Modifier.width(8.dp))
+          ActionButton("$sec s", { settings.update { it.copy(skipSeconds = sec) } }, primary = prefs.skipSeconds == sec)
+        }
+      }
+    }
+
     item { Group("YouTube search") }
     item {
       Text(
@@ -89,6 +105,41 @@ fun SettingsScreen(screen: Screen) {
           settings.update { it.copy(youtubeKey = "") }
         })
       }
+    }
+
+    item { Group("Film posters") }
+    item {
+      Toggle(
+          "Official names and artwork for films",
+          "Films in your DwellPlay folder get their poster art and proper name, looked up on TMDB by the name and year in the file name. Only that name is sent. Clips keep their own names.",
+          prefs.filmArt,
+      ) { on ->
+        settings.update { it.copy(filmArt = on) }
+        AppGraph.library.refreshAll()
+      }
+    }
+    if (prefs.filmArt) {
+      item {
+        Text(
+            if (prefs.effectiveTmdbKey != null) "Artwork lookups are on." else "Add a free TMDB API key (themoviedb.org, Settings, API) to turn on artwork lookups.",
+            style = type.body.copy(color = Palette.Text2),
+        )
+      }
+      item { DwellField(tmdbDraft, "TMDB API key", { tmdbDraft = it.trim() }, password = true) }
+      item {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          ActionButton("Save key", {
+            settings.update { it.copy(tmdbKey = tmdbDraft) }
+            AppGraph.library.refreshAll()
+            AppMessages.say(if (tmdbDraft.isBlank()) "Key removed" else "Key saved")
+          }, primary = tmdbDraft != prefs.tmdbKey)
+          ActionButton("Look up again", {
+            AppGraph.films.clear()
+            AppGraph.library.refreshAll()
+          })
+        }
+      }
+      item { Text("Film data from TMDB. This product uses the TMDB API but is not endorsed or certified by TMDB.", style = type.meta) }
     }
 
     item { Group("Car") }

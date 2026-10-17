@@ -18,12 +18,13 @@ android {
         // Android Auto runs parked apps on the car screen from Android 15; the phone app itself works from 10.
         minSdk 29
         targetSdk 36
-        versionCode 3
-        versionName "0.2.0"
+        versionCode 4
+        versionName "0.3.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
 
         // Search needs a YouTube Data API key (free, 100 searches a day). Shared links work without one.
         buildConfigField "String", "YOUTUBE_API_KEY", "\"${props.getProperty("youtubeApiKey", "")}\""
+        buildConfigField "String", "TMDB_API_KEY", "\"${props.getProperty("tmdbApiKey", "")}\""
     }
 
     // Two builds of the same app (see docs/android-auto.md):
@@ -120,6 +121,8 @@ dependencies {
     implementation "androidx.media3:media3-exoplayer-dash:$media3"
     implementation "androidx.media3:media3-session:$media3"
     implementation "androidx.media3:media3-ui-compose:$media3"
+    // SubtitleView: the Compose player surface draws no subtitles of its own.
+    implementation "androidx.media3:media3-ui:$media3"
     implementation "androidx.media3:media3-datasource-okhttp:$media3"
 
     // CarConnection (is Android Auto connected?) and CarFeatures (audio while driving on Android Automotive OS).

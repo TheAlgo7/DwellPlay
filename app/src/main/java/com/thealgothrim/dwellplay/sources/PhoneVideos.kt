@@ -53,7 +53,7 @@ object PhoneVideos {
    */
   const val FOLDER = "Movies/DwellPlay/"
   const val FOLDER_LABEL = "Movies › DwellPlay"
-  const val NAME = "DwellPlay folder"
+  const val NAME = "DwellPlay"
 
   suspend fun scan(context: Context): List<Video> =
       withContext(Dispatchers.IO) {
