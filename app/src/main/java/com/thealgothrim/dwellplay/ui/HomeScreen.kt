@@ -1,5 +1,6 @@
 package com.thealgothrim.dwellplay.ui
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -109,10 +110,18 @@ fun HomeScreen(screen: Screen, nav: AppNav, actions: AppActions, railNavigation:
 private fun HomeHeader(screen: Screen, showSettings: Boolean, onSettings: () -> Unit) {
   val dims = LocalDims.current
   val type = LocalType.current
+  val corners = LocalHostCorners.current
+  // On a compact Android Auto screen the header sits in the band between Android Auto's corner
+  // buttons instead of below it, so a 7-inch screen keeps that height for the cards.
+  val inBand = showSettings && corners.height > 0.dp
   BoxWithConstraints(Modifier.fillMaxWidth().gutters()) {
     val statusInRow = screen.isCar && maxWidth >= 720.dp
     Column {
-      Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+      Row(
+          Modifier.fillMaxWidth()
+              .then(if (inBand) Modifier.heightIn(min = corners.height).padding(start = (corners.start - dims.gutter).coerceAtLeast(0.dp)) else Modifier),
+          verticalAlignment = Alignment.CenterVertically,
+      ) {
         Column(Modifier.weight(1f)) {
           Wordmark()
           if (!screen.isCar) {
@@ -126,7 +135,7 @@ private fun HomeHeader(screen: Screen, showSettings: Boolean, onSettings: () -> 
           IconAction(Icons.Settings, "Settings", onClick = onSettings, modifier = Modifier.chrome(dims.touch / 2), tint = Palette.Text2)
         }
         // Android Auto's Exit button owns the top-right corner.
-        if (statusInRow) Spacer(Modifier.width(LocalHostCorners.current.end))
+        if (statusInRow || inBand) Spacer(Modifier.width((corners.end - if (inBand) dims.gutter else 0.dp).coerceAtLeast(0.dp)))
       }
       if (screen.isCar && !statusInRow) {
         Spacer(Modifier.height(dims.gap / 2))

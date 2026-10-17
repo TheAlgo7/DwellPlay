@@ -224,7 +224,8 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
         // The navigation floats over this, and its glass bends what scrolls underneath.
         Column(Modifier.fillMaxSize().backdropSource(backdrop).background(Palette.Canvas)) {
           // On compact projected windows, reserve both host corners for every browsing screen.
-          if (!wide) Spacer(Modifier.height(corners.height))
+          // Home puts its header in that band itself (HomeHeader).
+          if (!wide && nav.tab != Tab.HOME) Spacer(Modifier.height(corners.height))
           Box(Modifier.weight(1f)) { TabContent(nav, screen, actions, railNavigation = wide) }
         }
       }
