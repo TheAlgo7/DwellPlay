@@ -186,7 +186,7 @@ private fun SourceContent(entry: SourceEntry, nav: AppNav, actions: AppActions) 
           ActionButton("Look again", { library.sources.value.firstOrNull { it.id == entry.id }?.let(library::refresh) }, icon = Icons.Refresh)
         }
       } else {
-        VideoGrid(list, actions.open)
+        VideoGrid(list, actions.open, { v -> actions.dialog(AppDialog.Manage(v)) })
       }
     }
     SourceType.JELLYFIN -> ServerBrowser(entry, nav, actions)
@@ -197,8 +197,10 @@ private fun SourceContent(entry: SourceEntry, nav: AppNav, actions: AppActions) 
 private fun PhoneLibrary(phone: List<Video>, access: PhoneVideos.Access, actions: AppActions) {
   val dims = LocalDims.current
   var folder by remember { mutableStateOf<String?>(null) }
-  val folders = remember(phone) { phone.mapNotNull { it.subtitle }.groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key } }
-  val shown = if (folder == null) phone else phone.filter { it.subtitle == folder }
+  // The folder is the last part of the detail line ("Avengers: Endgame · DwellPlay" is in DwellPlay).
+  val folderOf = { v: Video -> v.subtitle?.substringAfterLast(" · ") }
+  val folders = remember(phone) { phone.mapNotNull(folderOf).groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key } }
+  val shown = if (folder == null) phone else phone.filter { folderOf(it) == folder }
   Column(Modifier.fillMaxSize()) {
     if (access == PhoneVideos.Access.SOME) InlineNotice("Showing only the videos you picked.", "Allow all", actions.askPhoneAccess)
     if (folders.size > 1) {
@@ -210,7 +212,7 @@ private fun PhoneLibrary(phone: List<Video>, access: PhoneVideos.Access, actions
     if (shown.isEmpty()) {
       MessagePanel(Icons.Folder, "Your ${PhoneVideos.NAME} is empty", "Put videos in ${PhoneVideos.FOLDER_LABEL} on ${Device.here} with any file manager. Other folders can be added in Sources.", Modifier.fillMaxSize())
     } else {
-      VideoGrid(shown, actions.open)
+      VideoGrid(shown, actions.open, { v -> actions.dialog(AppDialog.Manage(v)) })
     }
   }
 }

@@ -67,6 +67,7 @@ fun HomeScreen(screen: Screen, nav: AppNav, actions: AppActions, railNavigation:
           phone.take(24),
           progressOf,
           actions.open,
+          manage,
           action = {
             if (phone.size > 24) {
               ActionButton("See all ${phone.size}", onClick = {
@@ -93,7 +94,7 @@ fun HomeScreen(screen: Screen, nav: AppNav, actions: AppActions, railNavigation:
           }
         }
         SourceType.FOLDER ->
-            if (!folders[s.id].isNullOrEmpty()) item(key = "folder-${s.id}") { CardRow(s.name, folders[s.id].orEmpty().take(24), progressOf, actions.open) }
+            if (!folders[s.id].isNullOrEmpty()) item(key = "folder-${s.id}") { CardRow(s.name, folders[s.id].orEmpty().take(24), progressOf, actions.open, manage) }
         else -> Unit
       }
     }

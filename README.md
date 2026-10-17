@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/readme/hero.png" alt="DwellPlay on a 1920x720 car screen: Home with a glass navigation rail, and a film playing beside its controls" width="100%">
+  <img src="docs/readme/hero.png" alt="DwellPlay on a 1920x720 car screen: Home with film artwork and a glass navigation rail, and a trailer playing beside its controls" width="100%">
 </p>
 
 <p align="center">
@@ -40,31 +40,34 @@ It is a personal project, built first for one car: a Tata Curvv with a 10.25-inc
 
 <table>
   <tr>
-    <td align="center"><img src="docs/readme/car-home.png" width="420" alt="Home on the car screen with the glass rail"><br><sub>Home: posters slide under the glass rail</sub></td>
-    <td align="center"><img src="docs/readme/car-player.png" width="420" alt="A film playing beside its control panel"><br><sub>The player: picture and controls side by side</sub></td>
+    <td align="center"><img src="docs/readme/car-home.png" width="420" alt="Home on the car screen: film artwork and official trailers"><br><sub>Home: your films get their official artwork</sub></td>
+    <td align="center"><img src="docs/readme/car-player.png" width="420" alt="A trailer playing beside its control panel"><br><sub>The player: picture and controls side by side</sub></td>
   </tr>
   <tr>
-    <td align="center" colspan="2"><img src="docs/readme/car-fullscreen.png" width="560" alt="Full screen with one glass bar along the bottom"><br><sub>Full screen: the picture stays clear, everything else in one bar</sub></td>
+    <td align="center" colspan="2"><img src="docs/readme/car-fullscreen.png" width="560" alt="Full screen with one glass bar along the bottom"><br><sub>Full screen: tap to show the bar, tap again to hide it</sub></td>
   </tr>
 </table>
 
-**On the phone:** Home with the dock, the player, what it shows while the car moves, and the prompt after you park.
+**On the phone:** Home with the dock, the player with what's up next, what it shows while the car moves, and the prompt after you park.
 
 <p align="center"><img src="docs/readme/phone.png" width="100%" alt="Four phone screens: Home, the player, video paused while driving, and the Resume prompt after parking"></p>
 
 **The phone as the remote.** With Android Auto connected, a film picked on the phone opens on the car screen, and the phone keeps the controls without the picture.
 
-<p align="center"><img src="docs/readme/remote.png" width="100%" alt="The car screen playing an episode while the phone shows Playing on the car screen with its controls"></p>
+<p align="center"><img src="docs/readme/remote.png" width="100%" alt="The car screen playing a trailer while the phone shows Playing on the car screen with its controls"></p>
 
 ## Features
 
-- **Made for a parked car.** Wide panoramic screens get the picture and a control panel side by side; narrower and portrait screens stack them. Targets are 76dp and text 24sp or larger in the car, the scale Google asks for.
+- **Made for a parked car, on any head unit.** Wide panoramic screens (Tata Curvv, Nexon) get the picture and a control panel side by side. 16:9 screens (VW and Skoda 10-inch, Maruti 9-inch) play full screen. 7-inch screens keep the dock and the now-playing card on one row. Targets are 76dp and text 24sp or larger in the car, the scale Google asks for.
+- **Player gestures.** Tap to show or hide the controls. Double-tap the left or right of the picture to skip back or forward, and keep tapping to skip further; double-tap the middle to pause. Skips are 5 or 10 seconds, your choice in Settings.
+- **Audio language and subtitles.** Dual-audio films get a language picker, and the language you pick is tried first in the next film. Subtitles from the file show on the picture, lifted above the controls while they are up.
+- **Film artwork.** Films in your DwellPlay folder get their official artwork, with the title on it, and their proper name: "Spider-Man Brand New Day (2026) 1080p Dual Audio" becomes *Spider-Man: Brand New Day*, 2026. Clips keep their own names and show art from the film they come from. Lookups use TMDB and send only the name and year read from the file name.
 - **Navigation shared with WearWise and Dueline.** A floating pill of icon tabs on the phone, where the current tab opens into a crimson pill with its name, and the same pill standing upright beside the content on a wide car screen. Both are liquid glass: on Android 13 and later a GPU shader bends what scrolls underneath along the rim.
-- **Full screen without clutter.** Title at the top, one glass bar along the bottom with transport, the seek line with its times, and the picture options. Nothing sits in the top corners, where Android Auto takes the touches.
+- **Full screen without clutter.** Title at the top, one glass bar along the bottom with transport, the seek line with its times, mute and the picture options. On a narrow screen the bar becomes two rows with the transport centred. Nothing sits in the top corners, where Android Auto takes the touches. On the phone, full screen hides the status and navigation bars.
 - **The phone as the remote.** While Android Auto is connected, anything picked on the phone plays on the car screen, which opens its player by itself.
 - **Your own folder.** Phone videos come only from **Movies › DwellPlay**, the way some apps keep their own folder. The rest of the phone never appears unless you add a folder in Sources.
 - **Resume where you stopped.** Watch progress is kept for everything, and Continue watching brings it back on the phone and in the car.
-- **YouTube done properly.** Shared links play in YouTube's official embedded player with nothing drawn over it. Search works with a free YouTube Data API key.
+- **YouTube done properly.** Shared links play in YouTube's official embedded player with nothing drawn over it. The controls column sits in the black bar beside the picture, and a tap on the picture shows or hides it. Search works with a free YouTube Data API key.
 - **Jellyfin.** Sign in to your own server. It sends the original file when the car can play it and converts it on the fly when it can't.
 - **Costs nothing to run.** No accounts, no servers of our own, no analytics.
 
@@ -124,13 +127,15 @@ More in [docs/architecture.md](docs/architecture.md), [docs/android-auto.md](doc
 You need JDK 21 and the Android SDK (platform 36).
 
 ```powershell
-.\gradlew.bat :core:test                                        # 49 unit tests: safety rules, links, network rule, clients
+.\gradlew.bat :core:test                                        # 56 unit tests: safety rules, links, network rule, clients, film names
 powershell -File tools/build-install.ps1 -Launch                 # build the personal debug app and install it
 powershell -File tools/build-install.ps1 -Flavor store -Launch   # the store build
 bash tools/demo-data.sh emulator-5554                            # demo content on an emulator
 ```
 
 Debug builds are their own app ("DwellPlay debug", crimson on black), installed next to the real one, and take test commands over adb: pretend the car moves, add a link, play something. See [docs/testing.md](docs/testing.md).
+
+**Film artwork (free):** create a TMDB account, request an API key under Settings > API on themoviedb.org, and add `tmdbApiKey=<key>` to `local.properties`, or paste it into DwellPlay's Settings under Film posters. Release APKs here ship without one.
 
 **YouTube search (free, no card):** enable the YouTube Data API v3 in a Google Cloud project, create an API key restricted to that API, and add `youtubeApiKey=<key>` to `local.properties`, or paste it into DwellPlay's Settings. Google allows 100 searches a day; playing shared links doesn't count.
 
@@ -166,7 +171,10 @@ tools/         icon geometry, README images, build and install, demo data, the h
 
 ## Known limits
 
-- Tested on a Galaxy S24 Ultra, the Desktop Head Unit at the Curvv's screen size and emulators. An earlier build played in the real Curvv; 0.2.0 has not been in the car yet.
+- Tested on a Galaxy S24 Ultra with the Desktop Head Unit at four Indian head-unit sizes (`tools/dhu`: Curvv 1920x720, VW and Skoda 10-inch 1280x720, Maruti 9-inch 1280x720, 7-inch 800x480), and on emulators. Earlier builds have played in a real Curvv, Virtus GT and Nexon.
+- Android Auto greys out parked apps whenever it reads any speed, even in Park. DwellPlay can't change that; Android Auto decides it on the phone.
+- Audio tracks the phone can't decode (DTS on most phones) are left out of the language picker.
+- YouTube plays at its own size: zooming its player to fill the screen would hide YouTube's controls, which its terms don't allow.
 - Android Auto's parked-app route is meant for games. Google is opening it to video apps, starting with Android 17 phones.
 - The liquid glass bend needs Android 13; older phones get a tinted surface.
 - YouTube search needs your own free key, and Google caps it at 100 searches a day.
@@ -174,7 +182,9 @@ tools/         icon geometry, README images, build and install, demo data, the h
 
 ## Credits
 
-Playback: AndroidX Media3 (Apache 2.0). Images: Coil (Apache 2.0). Networking: OkHttp (Apache 2.0). Icons: Material Icons path data (Apache 2.0). Jellyfin is a trademark of the Jellyfin project and YouTube of Google; DwellPlay is not affiliated with either. The screenshots show Jellyfin's public demo server and test patterns.
+Playback: AndroidX Media3 (Apache 2.0). Images: Coil (Apache 2.0). Networking: OkHttp (Apache 2.0). Icons: Material Icons path data (Apache 2.0). Film names and artwork: [TMDB](https://www.themoviedb.org). This product uses the TMDB API but is not endorsed or certified by TMDB. Jellyfin is a trademark of the Jellyfin project and YouTube of Google; DwellPlay is not affiliated with either.
+
+The screenshots show official trailers from the Marvel Entertainment, Sony Pictures India, Netflix and DC YouTube channels, and film artwork from TMDB. Those films, shows and their artwork belong to their owners.
 
 ## Licence
 

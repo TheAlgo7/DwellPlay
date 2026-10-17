@@ -14,6 +14,8 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import com.thealgothrim.dwellplay.core.films.FilmCatalog
+import com.thealgothrim.dwellplay.sources.FilmArtStore
 import okhttp3.OkHttpClient
 
 /** The app's single instances, created on first use. The screens, the player service and the car share them. */
@@ -32,7 +34,9 @@ object AppGraph {
   val jellyfin: JellyfinClient by lazy {
     JellyfinClient(http, deviceId = settings.current.deviceId, deviceName = "${Build.MANUFACTURER} ${Build.MODEL}", appVersion = BuildConfig.VERSION_NAME)
   }
-  val library: Library by lazy { Library(app, store, jellyfin, youtube, scope) }
+  val filmCatalog: FilmCatalog by lazy { FilmCatalog(http, apiKey = { settings.current.effectiveTmdbKey }, clipHints = { name -> youtube.search(name, max = 5).map { it.title } }) }
+  val films: FilmArtStore by lazy { FilmArtStore(app, filmCatalog, enabled = { settings.current.filmArt }, scope) }
+  val library: Library by lazy { Library(app, store, jellyfin, youtube, scope, films) }
   val resolver: Resolver by lazy { Resolver(library, jellyfin) }
   val hub: PlayerHub by lazy { PlayerHub(app, library, resolver, settings, jellyfin, scope) }
 }

@@ -105,8 +105,10 @@ private class EmbedPlayer(private val context: Context, private val hub: PlayerH
         loadDataWithBaseURL("$origin/", html, "text/html", "utf-8", null)
       }
 
-  fun load(r: PlayerHub.YouTubeRequest) =
-      js("dwell.load(${str(r.videoId)}, ${str(r.playlistId)}, ${r.startSeconds}, ${r.autoplay}, ${r.captions}, ${r.playlistIndex})")
+  fun load(r: PlayerHub.YouTubeRequest) {
+    js("dwell.mute(${hub.muted.value})")
+    js("dwell.load(${str(r.videoId)}, ${str(r.playlistId)}, ${r.startSeconds}, ${r.autoplay}, ${r.captions}, ${r.playlistIndex})")
+  }
 
   override fun play() = js("dwell.play()")
 
@@ -121,6 +123,8 @@ private class EmbedPlayer(private val context: Context, private val hub: PlayerH
   override fun previous() = js("dwell.previous()")
 
   override fun captions(on: Boolean) = js("dwell.captions($on)")
+
+  override fun mute(on: Boolean) = js("dwell.mute($on)")
 
   fun destroy() {
     destroyed = true

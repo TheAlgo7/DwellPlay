@@ -24,6 +24,7 @@
   var pending = null;
   var loadingRequest = null;
   var ticker = null;
+  var muted = false;
 
   function bridge() { return window.DwellBridge; }
 
@@ -56,6 +57,7 @@
         onReady: function (e) {
           if (player !== e.target) return;
           ready = true;
+          if (muted) player.mute();
           if (req.playlistId) applyPlaylist(req);
           else req.autoplay ? player.playVideo() : player.pauseVideo();
           loadingRequest = null;
@@ -131,6 +133,11 @@
     },
     next: function () { player && ready && player.nextVideo(); },
     previous: function () { player && ready && player.previousVideo(); },
+    mute: function (on) {
+      muted = !!on;
+      if (!player || !ready) return;
+      on ? player.mute() : player.unMute();
+    },
     captions: function (on) {
       if (!player || !ready) return;
       try { on ? player.loadModule("captions") : player.unloadModule("captions"); } catch (e) {}

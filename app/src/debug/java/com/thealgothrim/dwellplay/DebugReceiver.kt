@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
  *
  *   R="-n com.thealgothrim.dwellplay.debug/com.thealgothrim.dwellplay.DebugReceiver"
  *   adb shell am broadcast $R -a add --es text "https://youtu.be/..."        (a YouTube or stream link)
- *   adb shell am broadcast $R -a play --es id yt:VIDEOID                     (or --es first phone|youtube|stream|jellyfin)
+ *   adb shell am broadcast $R -a play --es id yt:VIDEOID                     (or --es first phone|youtube|stream|jellyfin, or --es title "part of a title")
  *   adb shell am broadcast $R -a jellyfin --es url https://demo.jellyfin.org/stable --es user demo --es password ""
  *   adb shell am broadcast $R -a drive --ez on true                          (pretend the car moves / parks again)
  *   adb shell am broadcast $R -a car --ez on true                            (a second display counts as Android Auto's)
@@ -36,10 +36,12 @@ class DebugReceiver : BroadcastReceiver() {
           "play" -> {
             val id = intent.getStringExtra("id")
             val first = intent.getStringExtra("first")
+            val title = intent.getStringExtra("title")
             val all = library.phone.value + library.saved.value + library.shelves.value.values.flatMap { it.latest }
             val video =
                 when {
                   id != null -> library.find(id)
+                  title != null -> all.firstOrNull { it.title.contains(title, ignoreCase = true) && !it.isFolder }
                   first != null -> all.firstOrNull { it.type == SourceType.valueOf(first.uppercase()) && !it.isFolder }
                   else -> null
                 }
@@ -71,8 +73,10 @@ class DebugReceiver : BroadcastReceiver() {
           "convert" -> hub.askServerToConvert()
           "resume" -> hub.resumeVideo()
           "toggle" -> hub.togglePlay()
+          "mute" -> hub.setMuted(intent.getBooleanExtra("on", true))
           "close" -> hub.close()
           "state" -> Unit
+          "library" -> library.phone.value.forEach { Log.i(TAG, "library: ${it.title} | ${it.subtitle} | ${it.artworkUrl}") }
           else -> Log.w(TAG, "unknown action ${intent.action}")
         }
         Log.i(TAG, "state: now=${hub.now.value?.video?.id} safety=${hub.safety.value} ui=${hub.ui.value} problem=${hub.problem.value} youtube=${hub.youtube.value}")

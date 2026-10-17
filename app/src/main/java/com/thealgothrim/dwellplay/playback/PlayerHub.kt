@@ -8,8 +8,10 @@ import androidx.car.app.connection.CarConnection
 import androidx.core.content.ContextCompat
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Format
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
@@ -78,7 +80,14 @@ class PlayerHub(
       val durationMs: Long = 0,
       val videoAspect: Float? = null,
       val captionsAvailable: Boolean = false,
+      /** Playable audio tracks of the current file (dual-audio films have two or more). */
+      val audioTracks: List<TrackChoice> = emptyList(),
+      /** Subtitle tracks of the current file. */
+      val textTracks: List<TrackChoice> = emptyList(),
   )
+
+  /** One audio or subtitle track, labelled for people ("Hindi · 5.1", "English · SDH"). */
+  data class TrackChoice(val key: String, val label: String, val language: String?, val selected: Boolean)
 
   data class Problem(
       val title: String,
@@ -117,6 +126,8 @@ class PlayerHub(
     fun previous()
 
     fun captions(on: Boolean)
+
+    fun mute(on: Boolean)
   }
 
   private val _now = MutableStateFlow<NowPlaying?>(null)
@@ -131,6 +142,9 @@ class PlayerHub(
   val safety: StateFlow<SafetyMachine.State> = _safety.asStateFlow()
   private val _youtube = MutableStateFlow<YouTubeRequest?>(null)
   val youtube: StateFlow<YouTubeRequest?> = _youtube.asStateFlow()
+  private val _muted = MutableStateFlow(false)
+  /** Sound off for whatever plays, until unmuted. Lasts while the app runs; a fresh start has sound. */
+  val muted: StateFlow<Boolean> = _muted.asStateFlow()
   private val _controller = MutableStateFlow<MediaController?>(null)
   val controller: StateFlow<MediaController?> = _controller.asStateFlow()
 
@@ -146,6 +160,7 @@ class PlayerHub(
   private var startJob: Job? = null
   private var lastSave = 0L
   private var lastReport = 0L
+  private var tracks: Tracks = Tracks.EMPTY
 
   init {
     scope.launch {
@@ -338,7 +353,8 @@ class PlayerHub(
         PendingItems.put(item)
         val startPos = startAtMs ?: ResumeRules.startPosition(library.progressOf(video.id)) ?: 0L
         c.setMediaItem(item, startPos)
-        applyCaptions(c)
+        applyTrackPrefs(c, newFile = true)
+        c.volume = if (_muted.value) 0f else 1f
         c.prepare()
         d.serverSession?.let { reportServerStart(it, startPos) }
         _loading.value = false
@@ -419,8 +435,81 @@ class PlayerHub(
 
   fun setCaptions(on: Boolean) {
     settings.update { it.copy(captions = on) }
-    _controller.value?.let { applyCaptions(it) }
+    _controller.value?.let { applyTrackPrefs(it, newFile = false) }
     youtubeHandle?.captions(on)
+  }
+
+  fun setMuted(on: Boolean) {
+    _muted.value = on
+    _controller.value?.volume = if (on) 0f else 1f
+    youtubeHandle?.mute(on)
+  }
+
+  /** Play this audio track, and prefer its language in the next file too. */
+  fun selectAudio(key: String) {
+    val c = _controller.value ?: return
+    val (group, index) = trackAt(key, C.TRACK_TYPE_AUDIO) ?: return
+    group.getTrackFormat(index).language?.let { lang -> settings.update { it.copy(audioLanguage = lang) } }
+    c.trackSelectionParameters =
+        c.trackSelectionParameters.buildUpon().setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index)).build()
+  }
+
+  /** Show this subtitle track, or none when [key] is null. */
+  fun selectText(key: String?) {
+    val c = _controller.value ?: return
+    if (key == null) {
+      settings.update { it.copy(captions = false) }
+      c.trackSelectionParameters = c.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_TEXT).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
+      return
+    }
+    val (group, index) = trackAt(key, C.TRACK_TYPE_TEXT) ?: return
+    val lang = group.getTrackFormat(index).language
+    settings.update { it.copy(captions = true, textLanguage = lang ?: it.textLanguage) }
+    c.trackSelectionParameters =
+        c.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).setOverrideForType(TrackSelectionOverride(group.mediaTrackGroup, index)).build()
+  }
+
+  private fun trackAt(key: String, type: Int): Pair<Tracks.Group, Int>? {
+    val (g, t) = key.split(':').mapNotNull { it.toIntOrNull() }.takeIf { it.size == 2 } ?: return null
+    val group = tracks.groups.getOrNull(g)?.takeIf { it.type == type } ?: return null
+    return if (t in 0 until group.length) group to t else null
+  }
+
+  private fun choices(tracks: Tracks, type: Int): List<TrackChoice> {
+    val out = ArrayList<TrackChoice>()
+    tracks.groups.forEachIndexed { g, group ->
+      if (group.type != type) return@forEachIndexed
+      for (t in 0 until group.length) {
+        if (!group.isTrackSupported(t)) continue
+        val f = group.getTrackFormat(t)
+        out += TrackChoice("$g:$t", trackLabel(f, type, out.size + 1), f.language, group.isTrackSelected(t))
+      }
+    }
+    // Three tracks all called "English" still need telling apart.
+    val counts = out.groupingBy { it.label }.eachCount()
+    val seen = HashMap<String, Int>()
+    return out.map { c ->
+      if (counts.getValue(c.label) < 2) c
+      else c.copy(label = "${c.label} ${seen.merge(c.label, 1, Int::plus)}")
+    }
+  }
+
+  private fun trackLabel(f: Format, type: Int, n: Int): String {
+    val language =
+        f.language?.takeIf { it.isNotBlank() && it != C.LANGUAGE_UNDETERMINED }?.let { tag ->
+          Locale.forLanguageTag(tag).getDisplayLanguage(Locale.getDefault()).takeIf { it.isNotBlank() && it != tag }?.replaceFirstChar { it.titlecase(Locale.getDefault()) } ?: tag
+        }
+    val channels =
+        if (type != C.TRACK_TYPE_AUDIO) null
+        else when (f.channelCount) {
+          1 -> "Mono"
+          2 -> "Stereo"
+          6 -> "5.1"
+          8 -> "7.1"
+          else -> null
+        }
+    val title = f.label?.takeIf { it.isNotBlank() && !it.equals(language, ignoreCase = true) }
+    return listOfNotNull(language, title, channels).distinct().joinToString(" · ").ifBlank { if (type == C.TRACK_TYPE_AUDIO) "Audio $n" else "Subtitles $n" }
   }
 
   /** Where a title picked from the car's media screen should start. */
@@ -512,7 +601,10 @@ class PlayerHub(
         }
 
         override fun onTracksChanged(tracks: Tracks) {
-          _ui.update { it.copy(captionsAvailable = tracks.groups.any { g -> g.type == C.TRACK_TYPE_TEXT }) }
+          this@PlayerHub.tracks = tracks
+          val audio = choices(tracks, C.TRACK_TYPE_AUDIO)
+          val text = choices(tracks, C.TRACK_TYPE_TEXT)
+          _ui.update { it.copy(captionsAvailable = text.isNotEmpty(), audioTracks = audio, textTracks = text) }
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -665,13 +757,19 @@ class PlayerHub(
     scope.launch { library.connection(s.sourceId)?.let { runCatching { jellyfin.reportStopped(it, s.itemId, s.mediaSourceId, s.playSessionId, s.method, pos) } } }
   }
 
-  private fun applyCaptions(c: Player) {
-    val on = settings.current.captions
+  /**
+   * The remembered languages: the audio picked last time (a dual-audio film opens in it) and
+   * captions in the picked or the phone's language. A new file drops the last file's exact picks.
+   */
+  private fun applyTrackPrefs(c: Player, newFile: Boolean) {
+    val p = settings.current
+    val on = p.captions
+    val b = c.trackSelectionParameters.buildUpon()
+    if (newFile) b.clearOverridesOfType(C.TRACK_TYPE_AUDIO).clearOverridesOfType(C.TRACK_TYPE_TEXT)
     c.trackSelectionParameters =
-        c.trackSelectionParameters
-            .buildUpon()
+        b.setPreferredAudioLanguage(p.audioLanguage.ifBlank { null })
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !on)
-            .setPreferredTextLanguage(if (on) Locale.getDefault().language else null)
+            .setPreferredTextLanguage(if (on) p.textLanguage.ifBlank { Locale.getDefault().language } else null)
             .setSelectUndeterminedTextLanguage(on)
             .build()
   }

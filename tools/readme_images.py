@@ -1,11 +1,12 @@
-"""Builds the README images, banner included, from emulator screenshots.
+"""Builds the README images, banner included, from screenshots.
 
     python tools/readme_images.py <folder of screenshots>
 
-Expects the names tools/shot.sh was given while following docs/testing.md, with only demo content
-on screen (tools/demo-data.sh: test patterns, Jellyfin's public demo server, a YouTube link):
+Expects these names, taken on a real phone with the Desktop Head Unit (tools/dhu, the Curvv
+preset, cropped to its 1920x720 panel) or on an emulator following docs/testing.md:
   car-home, car-player, car-fullscreen, car-remote   the 1920x720 car display (the Curvv's panel)
   phone-home, phone-player, phone-driving, phone-parked, phone-remote
+Phone shots lose their status bar, so no notification ever reaches the page.
 Writes docs/readme/*.png. Needs Pillow, and Playwright with Microsoft Edge for the banner.
 """
 import os
@@ -19,8 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "docs" / "readme"
 OUT.mkdir(parents=True, exist_ok=True)
 CANVAS = (8, 9, 11)  # the app's canvas, so gaps read as part of the screen
-# The emulator draws its simulated car display as a window over the phone's top 360 px.
-OVERLAY_STRIP = 360
+# The phone's status bar (1080-wide shots), cropped off every phone screenshot.
+STATUS_BAR = 100
 
 
 def load(name):
@@ -28,9 +29,10 @@ def load(name):
 
 
 def car(name, width=1600):
-    """A car-display shot without the simulator's 30 px system strip."""
+    """A car-display shot. Emulator overlay shots lose their 30 px system strip."""
     im = load(name)
-    im = im.crop((0, 0, im.width, 690))
+    if im.height > 720:
+        im = im.crop((0, 0, im.width, 690))
     return im.resize((width, round(690 * width / im.width)), Image.LANCZOS)
 
 
@@ -47,10 +49,14 @@ def row(images, height, gap=28):
 for name in ("car-home", "car-player", "car-fullscreen"):
     car(name).save(OUT / f"{name}.png", optimize=True)
 
-row([load(n) for n in ("phone-home", "phone-player", "phone-driving", "phone-parked")], 1000).save(OUT / "phone.png", optimize=True)
+def phone(name, bottom=None):
+    im = load(name)
+    return im.crop((0, round(STATUS_BAR * im.width / 1080), im.width, bottom or im.height))
 
-phone = load("phone-remote")
-phone = phone.crop((0, OVERLAY_STRIP, phone.width, 1760))
+
+row([phone(n, 2000) for n in ("phone-home", "phone-player", "phone-driving", "phone-parked")], 1000).save(OUT / "phone.png", optimize=True)
+
+phone = phone("phone-remote", 1700)
 row([car("car-remote"), phone], 820).save(OUT / "remote.png", optimize=True)
 
 ICON = ROOT / "tools" / "icon" / "svg" / "dwellplay-icon.svg"

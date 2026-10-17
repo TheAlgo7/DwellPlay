@@ -71,6 +71,7 @@ class Library(
     private val jellyfin: JellyfinClient,
     private val youtube: YouTubeCatalog,
     private val scope: CoroutineScope,
+    private val films: FilmArtStore,
 ) {
   val phoneAccess = MutableStateFlow(PhoneVideos.access(context))
 
@@ -79,6 +80,20 @@ class Library(
 
   private val _folders = MutableStateFlow<Map<String, List<Video>>>(emptyMap())
   val folders: StateFlow<Map<String, List<Video>>> = _folders.asStateFlow()
+
+  // What the scans found, before film names and artwork are applied.
+  private var phoneRaw = emptyList<Video>()
+  private val foldersRaw = HashMap<String, List<Video>>()
+
+  init {
+    // A film's artwork arriving later redraws the lists it is in.
+    scope.launch {
+      films.art.collect {
+        _phone.value = phoneRaw.map(films::apply)
+        _folders.value = foldersRaw.mapValues { (_, l) -> l.map(films::apply) }
+      }
+    }
+  }
 
   private val _shelves = MutableStateFlow<Map<String, ServerShelf>>(emptyMap())
   val shelves: StateFlow<Map<String, ServerShelf>> = _shelves.asStateFlow()
@@ -93,7 +108,7 @@ class Library(
    * from another folder must not resurface on the car screen through history or search.
    */
   val history: StateFlow<List<Video>> =
-      combine(store.data, _phone) { d, phone -> d.recent.filter { v -> v.type != SourceType.PHONE || phone.any { it.id == v.id } } }
+      combine(store.data, _phone, films.art) { d, phone, _ -> d.recent.filter { v -> v.type != SourceType.PHONE || phone.any { it.id == v.id } }.map(films::apply) }
           .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
   val continueWatching: StateFlow<List<Video>> =
@@ -134,7 +149,7 @@ class Library(
     phoneScan =
         scope.launch {
           phoneAccess.value = PhoneVideos.access(context)
-          _phone.value =
+          phoneRaw =
               try {
                 PhoneVideos.scan(context).also { Log.i(TAG, "Phone videos: ${it.size} (access ${phoneAccess.value})") }
               } catch (e: CancellationException) {
@@ -143,6 +158,8 @@ class Library(
                 Log.w(TAG, "Phone video scan failed", e)
                 emptyList()
               }
+          _phone.value = phoneRaw.map(films::apply)
+          films.request(phoneRaw)
         }
   }
 
@@ -151,7 +168,9 @@ class Library(
       SourceType.FOLDER ->
           scope.launch {
             val found = runCatching { FolderVideos.scan(context, source) }.getOrElse { emptyList() }
-            _folders.update { it + (source.id to found) }
+            foldersRaw[source.id] = found
+            _folders.update { it + (source.id to found.map(films::apply)) }
+            films.request(found)
           }
       SourceType.JELLYFIN -> refreshServer(source)
       else -> Unit
@@ -284,6 +303,7 @@ class Library(
     val s = sources.value.firstOrNull { it.id == sourceId } ?: return
     s.folderUri?.let { FolderVideos.releaseAccess(context, Uri.parse(it)) }
     store.update { d -> d.copy(sources = d.sources.filter { it.id != sourceId }, recent = d.recent.filter { it.sourceId != sourceId }) }
+    foldersRaw.remove(sourceId)
     _folders.update { it - sourceId }
     _shelves.update { it - sourceId }
   }

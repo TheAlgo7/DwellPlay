@@ -3,6 +3,13 @@ package com.thealgothrim.dwellplay.ui
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.clickable
+import com.thealgothrim.dwellplay.core.films.FilmChoice
+import coil3.compose.AsyncImage
+import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -171,6 +178,11 @@ private fun Manage(video: Video, onDismiss: () -> Unit, actions: AppActions) {
   val library = AppGraph.library
   val saved by library.saved.collectAsState()
   val isSaved = saved.any { it.id == video.id }
+  var choosing by remember { mutableStateOf(false) }
+  if (choosing) {
+    ChooseFilm(video, onDone = onDismiss, onBack = { choosing = false })
+    return
+  }
   Row(verticalAlignment = Alignment.CenterVertically) {
     Artwork(video, Modifier.height(dims.touch * 1.4f).aspectRatio(16f / 9f))
     Spacer(Modifier.padding(start = dims.gap / 2))
@@ -188,6 +200,9 @@ private fun Manage(video: Video, onDismiss: () -> Unit, actions: AppActions) {
       val ref = video.ref as? MediaRef.YouTube
       ActionButton("Open in YouTube", { openInYouTube(context, ref?.videoId, ref?.playlistId) }, icon = Icons.Open)
     }
+    if ((video.type == SourceType.PHONE || video.type == SourceType.FOLDER) && AppGraph.filmCatalog.enabled) {
+      ActionButton("Change artwork", { choosing = true })
+    }
     if (isSaved) {
       ActionButton("Remove", {
         library.removeSaved(video.id)
@@ -196,6 +211,70 @@ private fun Manage(video: Video, onDismiss: () -> Unit, actions: AppActions) {
       }, icon = Icons.Delete)
     }
     ActionButton("Close", onDismiss)
+  }
+}
+
+/**
+ * Picks the film a video is, or comes from, when the automatic match is wrong or missing. Searches
+ * TMDB; "Part of this film" keeps the video's own name and uses a plain still from the film.
+ */
+@Composable
+private fun ChooseFilm(video: Video, onDone: () -> Unit, onBack: () -> Unit) {
+  val type = LocalType.current
+  val dims = LocalDims.current
+  val scope = rememberCoroutineScope()
+  var query by remember { mutableStateOf(video.subtitle?.substringBefore(" · ")?.takeIf { it.any(Char::isLetter) } ?: video.title) }
+  var results by remember { mutableStateOf<List<FilmChoice>>(emptyList()) }
+  var clip by remember { mutableStateOf(video.title.contains(" - ")) }
+  var busy by remember { mutableStateOf(false) }
+  LaunchedEffect(query) {
+    if (query.length < 2) return@LaunchedEffect
+    kotlinx.coroutines.delay(350)
+    results = runCatching { AppGraph.filmCatalog.search(query) }.getOrDefault(emptyList())
+  }
+  Text("Which film is this?", style = type.heading)
+  Text(video.title, style = type.meta, maxLines = 2)
+  DwellField(query, "Search films", { query = it })
+  Row(
+      Modifier.fillMaxWidth().clickable(role = Role.Checkbox) { clip = !clip }.padding(vertical = 6.dp),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Icon(if (clip) Icons.Check else Icons.Add, null, tint = if (clip) Palette.Accent else Palette.Text2, modifier = Modifier.size(dims.icon))
+    Spacer(Modifier.padding(start = 8.dp))
+    Text("Part of this film (keep the video's own name)", style = type.body)
+  }
+  results.forEach { f ->
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(dims.corner)).clickable(enabled = !busy, role = Role.Button) {
+          busy = true
+          scope.launch {
+            val art = runCatching { AppGraph.filmCatalog.artFor(f, clip) }.getOrNull()
+            if (art != null) {
+              AppGraph.films.choose(video, art)
+              AppMessages.say("Artwork from ${f.title}")
+              onDone()
+            } else {
+              AppMessages.say("Couldn't reach TMDB")
+              busy = false
+            }
+          }
+        }.padding(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+      AsyncImage(model = f.posterUrl, contentDescription = null, modifier = Modifier.height(dims.touch).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)))
+      Spacer(Modifier.padding(start = dims.gap / 2))
+      Column(Modifier.weight(1f)) {
+        Text(f.title, style = type.body, maxLines = 2)
+        f.year?.let { Text(it.toString(), style = type.meta) }
+      }
+    }
+  }
+  ButtonRow {
+    ActionButton("Use the video's own picture", {
+      AppGraph.films.choose(video, null)
+      onDone()
+    })
+    ActionButton("Back", onBack)
   }
 }
 

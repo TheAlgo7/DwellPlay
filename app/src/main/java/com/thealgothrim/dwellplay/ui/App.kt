@@ -194,12 +194,15 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
     }
   }
 
-  // Browsing content runs under the gesture bar; the floating chrome and the player keep clear of it.
-  // The keyboard still pushes everything up.
+  // Browsing content runs under the gesture bar; the floating chrome keeps clear of it. The keyboard
+  // still pushes everything up. The player handles the system bars itself: full screen hides them.
+  val playerShown = nav.playerOpen && now != null
   BoxWithConstraints(
       Modifier.fillMaxSize().background(Palette.Canvas)
-          .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
-          .windowInsetsPadding(WindowInsets.ime)
+          .then(
+              if (playerShown) Modifier
+              else Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)).windowInsetsPadding(WindowInsets.ime)
+          )
   ) {
     // A portrait car needs its width for content. Only a roomy landscape window gets the rail.
     // Short windows also use the dock, so the pinned Settings action never squeezes a tab's target.
@@ -207,14 +210,13 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
     val wide = roomForRail && if (screen.isCar) maxWidth >= 840.dp && maxWidth > maxHeight
         else maxWidth >= 840.dp || (maxWidth > maxHeight && maxWidth >= 600.dp)
     val current = now
+    val shortCar = screen.isCar && maxHeight < 560.dp && maxWidth >= 600.dp
     val density = LocalDensity.current
     val corners = LocalHostCorners.current
     // Height of whatever floats at the bottom (mini player, dock), so lists can scroll clear of it.
     var chromeHeight by remember { mutableStateOf(0.dp) }
     if (nav.playerOpen && current != null) {
-      Box(Modifier.windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom))) {
-        PlayerScreen(screen = screen, wide = wide, onClose = leavePlayer, actions = actions, pictureOnCar = pictureOnCar)
-      }
+      PlayerScreen(screen = screen, wide = wide, onClose = leavePlayer, actions = actions, pictureOnCar = pictureOnCar)
     } else {
       val backdrop = rememberBackdrop()
       val railInset = if (wide) RailMargin + LocalDims.current.touch + RailPadding * 2 else 0.dp
@@ -242,12 +244,22 @@ fun DwellApp(screen: Screen, restricted: Boolean, nav: AppNav) {
               .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Bottom)),
           horizontalAlignment = Alignment.CenterHorizontally,
       ) {
-        if (current != null) {
-          MiniPlayer(backdrop, onOpen = { nav.playerOpen = true })
-          Spacer(Modifier.height(10.dp))
+        // A short car screen (7-inch head units) can't spare two rows for the mini player and the
+        // dock: they share one, the dock on the driver's left of the bar and the film beside it.
+        val oneRow = shortCar && !wide && current != null && !WindowInsets.isImeVisible
+        if (oneRow) {
+          Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Dock(nav, backdrop)
+            MiniPlayer(backdrop, onOpen = { nav.playerOpen = true }, modifier = Modifier.weight(1f))
+          }
+        } else {
+          if (current != null) {
+            MiniPlayer(backdrop, onOpen = { nav.playerOpen = true })
+            Spacer(Modifier.height(10.dp))
+          }
+          // The dock steps aside while typing, so search results keep the room above the keyboard.
+          if (!wide && !WindowInsets.isImeVisible) Dock(nav, backdrop)
         }
-        // The dock steps aside while typing, so search results keep the room above the keyboard.
-        if (!wide && !WindowInsets.isImeVisible) Dock(nav, backdrop)
         Spacer(Modifier.height(if (wide) 16.dp else 14.dp))
       }
     }
@@ -379,7 +391,7 @@ private fun DockItem(tab: Tab, selected: Boolean, onClick: () -> Unit) {
 
 /** What's playing, a glass bar above the dock, when the player screen is closed. */
 @Composable
-private fun MiniPlayer(backdrop: Backdrop, onOpen: () -> Unit) {
+private fun MiniPlayer(backdrop: Backdrop, onOpen: () -> Unit, modifier: Modifier = Modifier) {
   val hub = AppGraph.hub
   val dims = LocalDims.current
   val type = LocalType.current
@@ -387,7 +399,7 @@ private fun MiniPlayer(backdrop: Backdrop, onOpen: () -> Unit) {
   val ui by hub.ui.collectAsState()
   val np = now ?: return
   val car = LocalScreen.current.isCar
-  Glass(backdrop, corner = dims.sheetCorner, modifier = Modifier.padding(horizontal = dims.gutter).widthIn(max = if (car) 760.dp else 560.dp).fillMaxWidth()) {
+  Glass(backdrop, corner = dims.sheetCorner, modifier = modifier.padding(horizontal = dims.gutter).widthIn(max = if (car) 760.dp else 560.dp).fillMaxWidth()) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(dims.sheetCorner)).clickable(onClick = onOpen).padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
